@@ -2,7 +2,7 @@ const {mergeCookie} = require('../util/cookie');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const axios = require('axios');
-const {tokenAndTokenparam, decodeRespData} = require('../jm.bundle/core/mobile');
+const {decideHeadersAndTs, tokenAndTokenparam, decodeRespData} = require('../jm.bundle/core/mobile');
 
 /**
  * 创建 http 请求客户端
@@ -60,34 +60,46 @@ function createHttpClient(config) {
     return httpClient;
 }
 
-APP_TOKEN_SECRET = '18comicAPP'
-APP_TOKEN_SECRET_2 = '18comicAPPContent'
+let config = {
+    userAgent: 'Mozilla/5.0 (Linux; Android 9; V1938CT Build/PQ3A.190705.11211812; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 Safari/537.36',
+    username: 'pigman17',
+    password: 'qq123456',
+    proxy: 'http://127.0.0.1:10809'
+};
+let httpClient = createHttpClient(config);
 
-function decide_headers_and_ts(uri) {
-    // 获取时间戳
-    let ts = new Date().getTime();
+async function reqApi(uri, get = true) {
     let {
-        token,
-        tokenparam
-    } = tokenAndTokenparam(ts, uri === '/chapter_view_template' ? APP_TOKEN_SECRET_2 : APP_TOKEN_SECRET);
-    //  设置headers
-    return {
-        ts: ts,
-        headers: {
-            'token': token,
-            'tokenparam': tokenparam,
-        }
+        ts,
+        headers
+    } = decideHeadersAndTs(uri);
+    let resp;
+    if (get) {
+        resp = await httpClient.get(`https://www.cdnhjk.net${uri}`, {
+            headers: {
+                ...headers
+            }
+        });
+    } else {
+        resp = await httpClient.post(`https://www.cdnhjk.net${uri}`, {
+            headers: {
+                ...headers
+            }
+        });
     }
+    let data = resp?.data?.data || '';
+    if (!data) {
+        return null;
+    }
+    if (Array.isArray(data) && data.length === 0) {
+        return null;
+    }
+    return  decodeRespData(resp?.data?.data || '', ts);
 }
 
 (async () => {
-    let config = {
-        userAgent: 'Mozilla/5.0 (Linux; Android 9; V1938CT Build/PQ3A.190705.11211812; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 Safari/537.36',
-        username: 'pigman17',
-        password: 'qq123456',
-        proxy: 'http://127.0.0.1:10809'
-    };
-    let httpClient = createHttpClient(config);
+
+
     let formData = new FormData();
     formData.append("username", config.username);
     formData.append("password", config.password);
@@ -99,19 +111,8 @@ function decide_headers_and_ts(uri) {
     if (apiResponse.status !== 200) {
         throw ERR.LOGIN_API_FAILED;
     }
-    let uri = '/album?id=1000276';
-    let {
-        ts,
-        headers
-    } = decide_headers_and_ts(uri);
-    let resp2 = await httpClient.get(`https://www.cdnhjk.net${uri}`, {
-        headers: {
-            ...headers,
-            userAgent: config.userAgent,
-            cookie: config.cookie
-        }
-    });
-    let data = decodeRespData(resp2?.data?.data || '', ts);
+    let resp1 = await reqApi('/album?id=1434235');
+    let resp2 = await reqApi('/album?id=1224005');
     return {
         newCookie: config.cookie
     };

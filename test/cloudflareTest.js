@@ -128,13 +128,24 @@ async function connectByPuppeteerRealBrowser(proxy) {
             // '--disable-extensions',
             '--disable-bookmark-bar',
             '--window-position=center',
-            '--app=about:blank',        // ✅ 去掉地址栏（Chromium app mode）
+            '--app=about:blank',        // ✅ 去掉地址栏（Chromium app mode）,
         ],
     });
     await page.setViewport({
         width: width,
         height: height
     });
+    await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+            get: function () {
+                return undefined;
+            }
+        });
+    });
+    let navigator = await page.evaluate({} , () => {
+        return window?.navigator;
+    });
+    console.log(navigator);
     return {
         browser,
         page
