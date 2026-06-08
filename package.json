@@ -1,0 +1,38 @@
+{
+  "name": "puzzle-bundles",
+  "author": "pigman17",
+  "version": "0.0.1",
+  "private": true,
+  "description": "PUZZLE模块工程",
+  "repository": "https://github.com/pigman18/bundles",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "abort-controller": "^3.0.0",
+    "axios": "^1.16.1",
+    "cheerio": "^1.2.0",
+    "commander": "^14.0.3",
+    "jimp": "^1.6.1",
+    "ocrad.js": "^0.0.1",
+    "puppeteer-core": "^25.1.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-real-browser": "^1.4.4",
+    "rebrowser-puppeteer-core": "^23.3.1",
+    "tesseract.js": "^7.0.0",
+    "tough-cookie": "^6.0.1",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "bufferutil": "^4.1.0",
+    "node-loader": "^2.1.0",
+    "rcedit": "^5.0.1",
+    "utf-8-validate": "^6.0.6",
+    "webpack": "^5.93.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-obfuscator": "^3.5.1",
+    "webpack-obfuscator-plugin": "^1.0.2"
+  }
+}

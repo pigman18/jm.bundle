@@ -1,0 +1,403 @@
+const axios = require('axios');
+const fs = require('node:fs');
+const path = require('node:path');
+const {touchFileSync, isNotEmptySync} = require('./file');
+let {logStart, logRunning, logDone, logError, logProgress, logDoneProgress} = require('./log');
+
+/**
+ * 拉取全部分页数据
+ * @param fn
+ * @param startPage 开始页码
+ */
+async function fetchAllPageData(fn, startPage = 1) {
+  let result = [];
+  // 1、查询首页
+  let pageInfo1 = await fn(startPage);
+  result.push(...(pageInfo1.list || []));
+  // 2、加载剩余页码
+  let nextStartPage = startPage + 1;
+  let endPage = pageInfo1.pages;
+  let pages = Array.from({ length: endPage - nextStartPage + 1 }, (_, i) => nextStartPage + i);
+  // 3、处理剩余分页
+  for(let page of pages) {
+    let pageInfo = await fn(page);
+    result.push(...(pageInfo.list || []));
+  }
+  return result;
+}
+
+/**
+ * 转换拼接链接
+ * @param params
+ * @return {string}
+ */
+function toQueryString(params) {
+  if (!params || typeof params !== 'object') return '';
+  return Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) =>
+      `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`
+    )
+    .join('&');
+}
+
+/**
+ * 获取CDN链接的原始链接
+ * @param cdnUrl {string}       CDN链接
+ * @param host {string}         原始域名
+ * @param cdnHosts {string[]}   多个CDN域名
+ * @return {string}
+ */
+function cdn2OriginUrl(cdnUrl, host, cdnHosts) {
+  if (!cdnUrl) {
+    return cdnUrl;
+  }
+  let url = cdnUrl;
+  for (let cdnHost of (cdnHosts || [])) {
+    if (url.indexOf(cdnHost) !== -1) {
+      url = url.split(cdnHost).join(host);
+      break;
+    }
+  }
+  return url;
+}
+
+/**
+ * 获取普通响应流的内容
+ * @param {*} response
+ * @returns {Promise<string>}
+ */
+async function getAxiosResponseText(response) {
+  const chunks = [];
+  for await (const chunk of response.data) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString('utf-8');
+}
+
+/**
+ * 给 response.stream 增加“假死检测”
+ * @param {AxiosResponse} response
+ * @param {number} timeoutMs 最大静默时间（ms）
+ * @returns {AxiosResponse}
+ */
+function guardStream(response, timeoutMs = 30_000) {
+  const stream = response.data;
+  if (!stream || typeof stream.on !== 'function') {
+    return response;
+  }
+
+  const controller = new AbortController();
+  let lastTick = Date.now();
+
+  const timer = setInterval(() => {
+    if (Date.now() - lastTick > timeoutMs) {
+      clearInterval(timer);
+      controller.abort();
+      stream.destroy(new Error('stream stalled'));
+    }
+  }, 5000);
+
+  stream.on('data', () => {
+    lastTick = Date.now();
+  });
+
+  stream.on('end', () => {
+    clearInterval(timer);
+  });
+
+  stream.on('error', () => {
+    clearInterval(timer);
+  });
+
+  // ✅ 只挂 signal，不碰 request
+  if (response.request && typeof response.request.abort === 'function') {
+    response.request.abort = () => controller.abort();
+  }
+
+  return response;
+}
+
+/**
+ * 获取响应流
+ * @param response
+ * @param options
+ * @return {Promise<*>}
+ */
+async function getResponseStream(response, options = {}) {
+  const {
+    onProgress,
+    withLog = false,
+    filename,
+  } = options;
+
+  const name = filename || 'unknown';
+  withLog && logStart(`${name} 下载`);
+
+  const totalLenRaw = response.headers['content-length'];
+  const totalLength = totalLenRaw ? parseInt(String(totalLenRaw), 10) : 0;
+  let downloadedLength = 0;
+
+  const stream = response.data;
+
+  // ✅ 关键：用 Promise 包裹 stream 生命周期
+  const done = new Promise((resolve, reject) => {
+    stream.on('data', chunk => {
+      downloadedLength += chunk.length;
+      withLog && logProgress(`${name} 下载`, downloadedLength, totalLenRaw);
+      onProgress?.({
+        complete: downloadedLength,
+        total: totalLength
+      });
+    });
+
+    stream.on('end', () => {
+      withLog && logDoneProgress(`${name} 下载`);
+      onProgress?.({
+        complete: downloadedLength,
+        total: totalLength || downloadedLength
+      });
+      resolve();
+    });
+
+    stream.on('error', err => {
+      withLog && logError(`${name} 下载`, err);
+      reject(err);
+    });
+  });
+
+  // ✅ 返回 stream，但函数本身会等完成
+  stream.done = done;
+  return stream;
+}
+
+/**
+ * 保存响应流
+ * @param {*} response
+ * @param {string} dataPath
+ * @param {string} bakDataPath
+ * @param onProgress
+ */
+async function saveAxiosResponse(response, dataPath, bakDataPath, onProgress, withLog = false) {
+  touchFileSync(bakDataPath);
+  let fileName = path.basename(dataPath);
+  withLog && logStart(`${fileName} 下载`);
+  const totalLenRaw = response.headers['content-length'];
+  const totalLength = totalLenRaw ? parseInt(String(totalLenRaw), 10) : 0;
+  let downloadedLength = 0;
+  const writer = fs.createWriteStream(bakDataPath);
+  response.data.on('data', chunk => {
+    downloadedLength += chunk.length;
+    withLog && logProgress(`${fileName} 下载`, downloadedLength, totalLenRaw);
+    if (onProgress) onProgress({complete: downloadedLength, total: totalLength});
+  });
+  response.data.pipe(writer);
+  await new Promise((resolve, reject) => {
+    writer.on('finish', () => {
+      if (fs.existsSync(bakDataPath)) {
+        fs.renameSync(bakDataPath, dataPath);
+      }
+      withLog && logDoneProgress(`${fileName} 下载`);
+      if (onProgress) {
+        try {
+          const st = require('node:fs').statSync(dataPath);
+          onProgress({complete: st.size, total: st.size});
+        } catch {
+          onProgress({
+            complete: downloadedLength,
+            total: totalLength || downloadedLength,
+          });
+        }
+      }
+      resolve();
+    });
+    writer.on('error', (err) => {
+      fs.rmSync(bakDataPath);
+      withLog && logError(`${fileName} 下载`, err);
+      reject(err);
+    });
+  });
+}
+
+function url2DataPath(url, dir = "/data") {
+  if (url.indexOf('?') !== -1) {
+    url = url.split('?')[0];
+  }
+  let filePath = url.split('https://').join('')
+    .split('http://').join('/');
+  if (filePath.indexOf(':') !== -1) {
+    filePath = filePath.split(":").join('--');
+  }
+  return `${dir}/${filePath}`;
+}
+
+/**
+ * 下载文件
+ * @param url         链接
+ * @param dir         保存到哪个目录
+ * @param mockAxios   从别的地方过来的请求对象，为空则用默认的
+ * @param onProgress  进度回调
+ * @param withForce   是否强制下载
+ * @return {Promise<string>}
+ */
+async function downloadFile(url, dir = "/data", mockAxios = axios, onProgress, withForce = false) {
+  if (!url) {
+    return null;
+  }
+  // 1、获取文件存储路径
+  let dataPath = url2DataPath(url, dir);
+  if (withForce || !isNotEmptySync(dataPath)) {
+    let bakDataPath = dataPath + ".bak";
+    // 2、下载文件
+    try {
+      touchFileSync(bakDataPath);
+      const response = await mockAxios({
+        url,
+        method: 'GET',
+        responseType: 'stream',
+      });
+      await saveAxiosResponse(response, dataPath, bakDataPath, onProgress);
+    } catch (err) {
+      fs.rmSync(bakDataPath);
+      throw err;
+    }
+  }
+  return dataPath;
+}
+
+/**
+ * 获取文件名适合的mime
+ * @param file
+ * @return {string}
+ */
+function getMime(file) {
+  const lower = String(file).toLowerCase();
+  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
+  if (lower.endsWith('.js')) return 'text/javascript; charset=utf-8';
+  if (lower.endsWith('.mjs')) return 'text/javascript; charset=utf-8';
+  if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.woff2')) return 'font/woff2';
+  if (lower.endsWith('.woff')) return 'font/woff';
+  if (lower.endsWith('.ico')) return 'image/x-icon';
+  return 'application/octet-stream';
+}
+
+let Http = {
+
+  getFinalUrl(url) {
+    if (url.indexOf('?') !== -1) {
+      url = url.split('?')[0];
+    }
+    return url;
+  },
+
+  /**
+   * 下载文件
+   * @param urls
+   * @param dir
+   * @param mockAxios
+   * @return {Promise<void>}
+   */
+  async downloadFiles(urls, dir = "/data", mockAxios = axios) {
+    let complete = 0;
+    for (let url of urls) {
+      if (!!url) {
+        // 1、调用下载
+        await Http.downloadFile(url, dir, mockAxios);
+      }
+      // 2、打印总进度
+      complete += 1;
+      console.log(`========== 文件列表进度：${complete} / ${urls.length} ==========`)
+    }
+  },
+
+  async checkImageUrl(url) {
+    try {
+      const response = await axios.head(url, {
+        timeout: 5000, // 5秒超时
+        validateStatus: (status) => true, // 不抛出错误，返回所有状态码
+      });
+      const {status, headers} = response;
+      if (status === 200) {
+        const contentType = headers['content-type'] || '';
+        const contentLength = headers['content-length'] || 0;
+        // 检查是否是图片类型
+        const isImage = contentType.startsWith('image/');
+        return {
+          valid: isImage,
+          status,
+          contentType,
+          contentLength: parseInt(contentLength),
+          message: isImage ? '有效的图片URL' : 'URL有效但不是图片',
+        };
+      } else {
+        return {
+          valid: false,
+          status,
+          message: `HTTP状态码错误: ${status}`,
+        };
+      }
+    } catch (error) {
+      return {
+        valid: false,
+        error: error.message,
+        message: '网络错误或URL无效',
+      };
+    }
+  }
+};
+
+/**
+ * 无侵入 axios 重试包装器
+ * @param {Function} fn axios 请求方法
+ * @param {number} retries 重试次数
+ * @param {number} delay 初始延迟 ms
+ */
+function withRetry(fn, retries = 3, delay = 1000) {
+  return async (...args) => {
+    let lastError;
+
+    for (let i = 0; i <= retries; i++) {
+      try {
+        return await fn(...args);
+      } catch (err) {
+        lastError = err;
+
+        // ✅ 只对 502 / 504 / 代理失败重试
+        const shouldRetry =
+          err.response?.status === 502 ||
+          err.response?.status === 504 ||
+          err.code === 'ECONNABORTED' ||
+          err.code === 'ECONNRESET';
+
+        if (!shouldRetry || i === retries) {
+          throw err;
+        }
+
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+      }
+    }
+
+    throw lastError;
+  };
+}
+
+module.exports = {
+  cdn2OriginUrl,
+  saveAxiosResponse,
+  getResponseStream,
+  getAxiosResponseText,
+  downloadFile,
+  url2DataPath,
+  getMime,
+  withRetry,
+  toQueryString,
+  fetchAllPageData,
+  guardStream,
+  ...Http
+};

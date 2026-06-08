@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>JM 模块说明</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      padding: 24px;
+      max-width: 720px;
+      margin: auto;
+      color: #333;
+    }
+    h1, h2 {
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 8px;
+      margin-top: 24px;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    p {
+      margin: 12px 0;
+    }
+  </style>
+</head>
+<body>
+
+<h1>JM 模块说明</h1>
+
+<p>
+  本模块用于在 Puzzle 中提供 JM 漫画的快速导航与下载能力。
+</p>
+
+<p>
+  实现方式为模拟登录 JM 主站并进行下载。<br />
+  在网络环境较差时，流程可能较慢；必要时会在浏览器中完成登录验证。
+</p>
+
+<p>
+  <strong>配置方式：</strong><br />
+  编辑 <code>config.json</code>，或点击模块卡片右上角的齿轮图标进行设置。<br />
+  <strong>命令行用法：</strong><code>node jm.bundle.js --help</code>
+</p>
+
+<hr />
+
+<h2>为什么做这个模块</h2>
+<p>
+  起因很简单：<br />
+  想找回很久以前看过的一本本子，但搜索了几天都找不到。<br />
+  既然找不到，就只能尝试写脚本把站点内容爬下来。
+</p>
+
+<h2>为什么做成这样</h2>
+<p>
+  爬完数据之后，需要一个界面来检索和使用。<br />
+  虽然核心逻辑支持命令行模式，但为了更直观的操作体验，<br />
+  直接借助 AI 辅助编写了一个客户端模块，并由 Puzzle 加载运行。
+</p>
+
+<h2>为什么不放服务器</h2>
+<p>
+  本质仍然是模拟用户登录与下载。<br />
+  如果放到服务器上，就等于把内容变成了我自己的文件，<br />
+  这与初衷不符，因此只在本地运行。
+</p>
+
+</body>
+</html>
