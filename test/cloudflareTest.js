@@ -1,11 +1,3 @@
-const puppeteer = require('puppeteer-core');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-
-// 启用 stealth 反检测
-// puppeteer.use(StealthPlugin());
-
-const {pageController} = require('./module/pageController');
-
 const {mergeCookie} = require('../util/cookie');
 const {safeClose} = require('../util/cloudflare');
 
@@ -18,14 +10,9 @@ const {safeClose} = require('../util/cloudflare');
  * @return {Promise<{cookie: string, userAgent: string}>}
  */
 async function getJmCloudflareCookie(browser, page,  url, onProgress,) {
-    let width = 1920, height = 1080;
     let cookie = '';
     await page.goto(url, {
         waitUntil: 'domcontentloaded'
-    });
-    await page.setViewport({
-        width: width,
-        height: height
     });
     // 方法B：页面请求时拦截加上头
     // 3、注册响应查看，方便排查
@@ -53,6 +40,7 @@ async function getJmCloudflareCookie(browser, page,  url, onProgress,) {
                 cookie = mergeCookie(cookie, reqCookie);
                 cookie = mergeCookie(cookie, respCookie);
             }
+            console.log(`[${method}] ${url}`);
             for(let key in reqHeaders) {
                 if (reqHeaders.hasOwnProperty(key)) {
                     if (key.startsWith('sec-')) {
@@ -97,18 +85,32 @@ async function getJmCloudflareCookie(browser, page,  url, onProgress,) {
     };
 }
 
-
-(async () => {
-    let width = 1920, height = 1080;
-    let proxy = 'http://127.0.0.1:10809';
-    let options = {
-        executablePath:
-            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+async function connectByPuppeteerRealBrowser(proxy) {
+    const {connect} = require('puppeteer-real-browser');
+    let width = 960, height = 540;
+    let {
+        browser,
+        page
+    } = await connect({
         headless: 'new',
+        plugins: [
+            require("puppeteer-extra-plugin-stealth")(),
+            require("puppeteer-extra-plugin-human-typing")()
+        ],
         args: [
             `--proxy-server=${proxy}`,
             `--window-size=${width},${height}`,
-            '--lang=zh-CN',
+            '--lang=zh-CN',                                    // 设置语言
+            '--timezone=Asia/Shanghai',                        // 时区（部分版本
+            '--force-device-scale-factor=1',                   // 强制 DPR
+            '--disable-features=IsolateOrigins,TranslateUI',   // 关隔离/翻译
+            // '--start-maximized',                                // 启动时最大化
+            // '--kiosk',                                          // 全屏展台模式
+            "--no-sandbox",                                     // 禁用沙盒
+            "--disable-setuid-sandbox",                         // 禁用 setuid 沙盒
+            '--disable-blink-features=AutomationControlled',    // 阻止设置 navigator.webdriver=true
+            '--disable-infobars',                               // 移除“Chrome 正被自动软件控制”条
+            '--no-first-run',                                   // 跳过首次运行向导
             '--enable-features=UserAgentClientHint',
             // '--auto-open-devtools-for-tabs', // 打开开发者工具的控制台
             // 禁用“保存密码”气泡/弹窗
@@ -123,38 +125,27 @@ async function getJmCloudflareCookie(browser, page,  url, onProgress,) {
             '--disable-dev-shm-usage',
             '--disable-extensions',
             '--disable-background-networking',
-            '--disable-blink-features=AutomationControlled',
             // '--disable-extensions',
-            '--disable-infobars',
             '--disable-bookmark-bar',
             '--window-position=center',
             '--app=about:blank',        // ✅ 去掉地址栏（Chromium app mode）
         ],
-    };
-    const browser = await puppeteer.launch(options);
-    const page = await browser.newPage();
-    let pageControllerConfig = {
+    });
+    await page.setViewport({
+        width: width,
+        height: height
+    });
+    return {
         browser,
-        page,
-        proxy,
-        turnstile: true,
-        pid: browser.process()?.pid,
-        plugins: [
-
-        ]
+        page
     };
+}
 
-    await pageController({
-        ...pageControllerConfig,
-        killProcess: true
-    });
-    browser.on("targetcreated", async (target) => {
-        if (target.type() === "page") {
-            let newPage = await target.page();
-            pageControllerConfig.page = newPage;
-            newPage = await pageController(pageControllerConfig);
-        }
-    });
+(async () => {
+    let {
+        browser,
+        page
+    } = await connectByPuppeteerRealBrowser('http://127.0.0.1:10809');
     // 获取cookie
     let {
         cookie,
