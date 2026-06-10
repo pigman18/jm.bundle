@@ -20,7 +20,7 @@ const {touchFileSync, writeToFileSync, isNotEmptySync, renameSync} = require('..
 const {buffer2Base64Image} = require('../../util/image');
 const {calcMathCaptcha} = require('../../util/captcha');
 const {parseComicRankingPage, parseSerializationList, parseWeekList, parseComicWeekList, parseMeta, parseNumber} = require('./parser');
-
+const {decideHeadersAndTs, tokenAndTokenparam, decodeRespData} = require('./mobile');
 
 // ================= JM 客户端 =================
 /**
@@ -179,6 +179,42 @@ function createCrawler(manifest, ctx, message, config) {
         } catch {
             return true;
         }
+    }
+
+    /**
+     * 请求api接口
+     * @param uri
+     * @param get
+     * @return {Promise<string|null>}
+     */
+    async function reqApi(uri, get = true) {
+        let apiHost = config.apiHosts[Math.floor(Math.random() * config.apiHosts.length)];
+        let {
+            ts,
+            headers
+        } = decideHeadersAndTs(uri);
+        let resp;
+        if (get) {
+            resp = await httpClient.get(`${apiHost}${uri}`, {
+                headers: {
+                    ...headers
+                }
+            });
+        } else {
+            resp = await httpClient.post(`${apiHost}${uri}`, {
+                headers: {
+                    ...headers
+                }
+            });
+        }
+        let data = resp?.data?.data || '';
+        if (!data) {
+            return null;
+        }
+        if (Array.isArray(data) && data.length === 0) {
+            return null;
+        }
+        return decodeRespData(resp?.data?.data || '', ts);
     }
 
     /**
@@ -487,6 +523,22 @@ function createCrawler(manifest, ctx, message, config) {
      */
     async function sign() {
 
+    }
+
+    /**
+     * 获取漫画元数据
+     * @param number
+     * @param phase
+     * @return {Promise<void>}
+     */
+    async function getMeta(number, phase = PHASE.GET_META) {
+        return await message.doPhase(phase || PHASE.GET_META, async (stepHandler) => {
+            let data = await reqApi(`/album?id=${number}`);
+            return {
+                number,
+                meta: data
+            };
+        }, {number});
     }
 
     /**
@@ -998,38 +1050,25 @@ function createCrawler(manifest, ctx, message, config) {
 
     let album = {
         // 获取漫画元信息
-        getMeta: async (number, phase = PHASE.FETCH_INFO_HTML) => {
+        getMeta: async (number, phase = PHASE.GET_META) => {
             number = parseNumber(number);
-            let htmlFile = `${infoHtmlDir}/${number}.txt`;
-            let html = '';
-            if (isNotEmptySync(htmlFile)) {
+            let file = `${infoDir}/${number}.json`;
+            if (isNotEmptySync(file)) {
                 // 1、本地文件存在时，解压本地文件
-                html = unZipText(fs.readFileSync(htmlFile, 'utf-8'));
-            } else {
-                // 2、请求最新内容
-                let htmlResult = await expireRetry(() => fetchAlbumHtml(number, phase));
-                html = htmlResult.html;
+               try {
+                   return JSON.parse(fs.readFileSync(file, 'utf-8'));
+               } catch (_) {}
             }
-            if (!html) {
+            // 2、请求最新内容
+            let {
+                meta
+            } = await expireRetry(() => getMeta(number, phase));
+            if (!meta) {
                 throw ERR.INFO_NOT_FOUND;
             }
             // 3、保存漫画压缩内容
-            writeToFileSync(htmlFile, zipText(html));
-            // 4、转换基本信息
-            let meta = parseMeta(html);
-            if (!!meta) {
-                if (meta.aid !== number) {
-                    // 实际编码和请求编码不一致，说明是跳转的
-                    meta.redirect = meta.aid;
-                }
-                // 兼容之前的数据
-                meta.number = number;
-                (meta.episodes || []).forEach((episode) => {
-                    episode.number = episode.aid;
-                });
-                return meta;
-            }
-            throw ERR.INFO_NOT_FOUND;
+            writeToFileSync(file, JSON.stringify(meta));
+            return meta;
         },
         // 下载漫画压缩包
         downloadArchive: async (number, withAppendComicInfo = true, afterSteps = null) => {

@@ -4,11 +4,7 @@
       "text": "[用户登录]",
       "color": "#c678dd"
     },
-    "fetch_info_html": {
-      "text": "[漫画主页]",
-      "color": "#61afef"
-    },
-    "fetch_info": {
+    "get_meta": {
       "text": "[漫画信息]",
       "color": "#61afef"
     },
