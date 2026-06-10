@@ -12,7 +12,6 @@ let defaultConfig = {
     "port": 47310,
     "comicViewer": 'linux' === process.platform ? "" : "C:\\Program Files\\ComicRack\\ComicRack.exe",
     "timeout": 86400000,
-    "loginHost": "https://www.cdnhjk.net",
     "host": "https://18comic.vip",
     "cdnHosts": [
         "https://cdn-msp.18comic.vip",

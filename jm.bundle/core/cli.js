@@ -63,7 +63,7 @@ function createCli(
         return JSON.parse(fs.readFileSync(p, 'utf-8'));
     };
 
-    const wait = () => sleep(800 + Math.random() * 400);
+    const wait = () => sleep(100 + Math.random() * 100);
 
     async function processBatch(list, fn) {
         list.forEach(i => queue.add(() => fn(i)));
