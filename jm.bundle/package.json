@@ -17,14 +17,15 @@
     "search:keyword": "node jm.bundle.js search:keyword",
     "rank:weekly": "node jm.bundle.js rank:weekly",
     "rank:serials": "node jm.bundle.js rank:serials",
-    "server": "node jm.bundle.js server"
+    "server": "node jm.bundle.js server",
+    "command": "node jm.bundle.js"
   },
   "dependencies": {
     "async-lock": "^1.4.1",
     "compression": "^1.8.1",
     "express": "^4.22.1",
     "express-ws": "^5.0.2",
-    "https-proxy-agent": "^9.0.0",
+    "https-proxy-agent": "^9.1.0",
     "jszip": "^3.10.1",
     "morgan": "^1.10.1",
     "node-notifier": "^10.0.1",
@@ -120,5 +121,8 @@
         "message": "拉取漫画下载失败"
       }
     }
+  },
+  "devDependencies": {
+    "kerberos": "^2.2.2"
   }
 }

@@ -20,11 +20,11 @@ let defaultConfig = {
         "https://cdn-msp3.18comic.vip"
     ],
     "apiHosts": [
-        'https://www.cdnhjk.net',
-        'https://www.cdngwc.cc',
-        'https://www.cdngwc.net',
-        'https://www.cdngwc.club',
-        'https://www.cdnhjk.cc',
+        "https://www.cdnhjk.net",
+        "https://www.cdngwc.cc",
+        "https://www.cdngwc.net",
+        "https://www.cdngwc.club",
+        "https://www.cdnhjk.cc",
     ],
     "headless": false
 };

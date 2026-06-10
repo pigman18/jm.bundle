@@ -40,6 +40,16 @@ function createCli(
         return fs.existsSync(`${manifest.workspace}/temp/html/${number}.txt.flag`);
     }
 
+
+    /* ================= Server ================= */
+
+    program
+        .command('server')
+        .description('本地服务')
+        .action(async () => {
+            await server.start();
+        });
+
     /* ================= 工具 ================= */
 
     const readNumbers = (file) => {
@@ -215,7 +225,6 @@ function createCli(
         .description('查询漫画')
         .option('-f, --file <file>')
         .action(async (number, opts) => {
-            const excludes = JSON.parse(fs.readFileSync(`${manifest.workspace}/config/excludes.json`, 'utf-8'));
             const action = (n) => crawler.album.getMeta(n);
             if (number) return runSingle('拉取元数据', number, action);
             if (opts.file) return runBatch('拉取元数据', opts.file, action, (numbers) => {
@@ -439,17 +448,14 @@ Examples:
             list.forEach(i => console.log(i.aid));
         });
 
-    /* ================= Server ================= */
-
-    program
-        .command('server')
-        .description('本地服务')
-        .action(async () => {
-            await server.start();
-        });
-
     return {
         run: async () => {
+            // 只有“完全没有任何参数”才走默认 server
+            if (argv.length === 0) {
+                console.log('未指定命令，默认启动本地服务...');
+                await server.start();
+                return;
+            }
             program.parse(argv, {from: 'user'});
         }
     };

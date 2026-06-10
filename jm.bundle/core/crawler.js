@@ -37,8 +37,21 @@ function createCrawler(manifest, ctx, message, config) {
     let {
         host,
         cdnHosts,
+        apiHosts,
         dataDir
     } = config;
+    cdnHosts = cdnHosts || [
+        "https://cdn-msp.18comic.vip",
+        "https://cdn-msp2.18comic.vip",
+        "https://cdn-msp3.18comic.vip"
+    ];
+    apiHosts = apiHosts || [
+        "https://www.cdnhjk.net",
+        "https://www.cdngwc.cc",
+        "https://www.cdngwc.net",
+        "https://www.cdngwc.club",
+        "https://www.cdnhjk.cc",
+    ];
     let requestExtraHeaders = {
         'sec-ch-ua-arch': '"x86"'
     };
@@ -188,7 +201,7 @@ function createCrawler(manifest, ctx, message, config) {
      * @return {Promise<string|null>}
      */
     async function reqApi(uri, get = true) {
-        let apiHost = config.apiHosts[Math.floor(Math.random() * config.apiHosts.length)];
+        let apiHost = apiHosts[Math.floor(Math.random() * apiHosts.length)];
         let {
             ts,
             headers
