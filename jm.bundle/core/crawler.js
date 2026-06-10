@@ -14,13 +14,12 @@ const lock = new AsyncLock();
 const {PHASE, STATE, STEP, ERR} = require('../protocol');
 const {retryAndCatch, zipText, unZipText} = require('../../util/common');
 const {safeClose} = require('../../util/cloudflare');
-const {getAxiosResponseCookie, mergeCookie, getExpires} = require('../../util/cookie');
-const {cdn2OriginUrl, saveAxiosResponse, getResponseStream, downloadFile, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData, guardStream} = require('../../util/http');
+const {mergeCookie} = require('../../util/cookie');
+const {url2DataPath, saveAxiosResponse, getResponseStream, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData} = require('../../util/http');
 const {touchFileSync, writeToFileSync, isNotEmptySync, renameSync} = require('../../util/file');
 const {buffer2Base64Image} = require('../../util/image');
 const {calcMathCaptcha} = require('../../util/captcha');
 const {parseComicRankingPage, parseSerializationList, parseWeekList, parseComicWeekList, parseMeta, parseNumber} = require('./parser');
-const {parseDate} = require("tough-cookie");
 
 
 // ================= JM 客户端 =================
@@ -730,24 +729,30 @@ function createCrawler(manifest, ctx, message, config) {
      * @returns {Promise<string>}
      */
     async function fetchRemoteFile(url, force = false) {
-        return await message.doPhase(PHASE.FETCH_FILE, async (stepHandler, phaseMessageData) => {
-            // 1、校验链接
-            url = (url || '').trim();
-            if (!url) {
-                return {
-                    file: null
-                };
-            }
-            // 2、替换掉 cdn 获取原始链接
-            let originUrl = cdn2OriginUrl(url, config.host, config.cdnHosts);
-            // 3、进行文件下载
+        // 1、校验链接
+        url = (url || '').trim();
+        if (!url) {
+            return null;
+        }
+        let dataPath = url2DataPath(url, fileDir, false);
+        if (isNotEmptySync(dataPath)) {
+            return dataPath;
+        }
+        let {
+            file
+        } =  await message.doPhase(PHASE.FETCH_FILE, async (stepHandler, phaseMessageData) => {
+            // 1、进行文件下载
             return await expireRetry(async () => {
-                return await downloadFile(originUrl, fileDir, httpClient, ({complete, total}) => {
-                    phaseMessageData.complete = complete;
-                    phaseMessageData.total = total;
-                }, force);
+                const response = await httpClient.get(url, {
+                    responseType: 'stream',
+                });
+                await saveAxiosResponse(response, dataPath);
+                return {
+                    file: dataPath
+                }
             });
         });
+        return file;
     }
 
     /**

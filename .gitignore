@@ -3,6 +3,7 @@ out/
 dist/
 release/
 jm.bundle/config.json
+test/config.json
 .data/
 *.log
 

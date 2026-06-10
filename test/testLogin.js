@@ -1,4 +1,5 @@
 const {mergeCookie} = require('../util/cookie');
+const {saveAxiosResponse} = require('../util/http');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const axios = require('axios');
@@ -60,6 +61,31 @@ function createHttpClient(config) {
     return httpClient;
 }
 
+// 移动端图片域名
+let DOMAIN_IMAGE_LIST = [
+    'cdn-msp.jmapiproxy1.cc',
+    'cdn-msp.jmapiproxy2.cc',
+    'cdn-msp2.jmapiproxy2.cc',
+    'cdn-msp3.jmapiproxy2.cc',
+    'cdn-msp.jmapinodeudzn.net',
+    'cdn-msp3.jmapinodeudzn.net',
+];
+
+// 移动端API域名
+let DOMAIN_API_LIST = [
+    'www.cdnhjk.net',
+    'www.cdngwc.cc',
+    'www.cdngwc.net',
+    'www.cdngwc.club',
+    'www.cdnhjk.cc',
+];
+
+// 获取最新移动端API域名的地址
+let API_URL_DOMAIN_SERVER_LIST = [
+    'https://rup4a04-c01.tos-ap-southeast-1.bytepluses.com/newsvr-2025.txt',
+    'https://rup4a04-c02.tos-cn-hongkong.bytepluses.com/newsvr-2025.txt'
+];
+
 let config = {
     userAgent: 'Mozilla/5.0 (Linux; Android 9; V1938CT Build/PQ3A.190705.11211812; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 Safari/537.36',
     username: 'pigman17',
@@ -98,8 +124,6 @@ async function reqApi(uri, get = true) {
 }
 
 (async () => {
-
-
     let formData = new FormData();
     formData.append("username", config.username);
     formData.append("password", config.password);
@@ -113,6 +137,14 @@ async function reqApi(uri, get = true) {
     }
     let resp1 = await reqApi('/album?id=1434235');
     let resp2 = await reqApi('/album?id=1224005');
+    // let url = `https://${DOMAIN_IMAGE_LIST[Math.floor(Math.random() * DOMAIN_IMAGE_LIST.length)]}/media/albums/1441017.jpg?u=1779420336`;
+    let url = `https://cdn-msp2.18comic.vip/media/albums/1441017.jpg?u=1779420336`;
+    const response = await httpClient({
+        url,
+        method: 'GET',
+        responseType: 'stream',
+    });
+    await saveAxiosResponse(response, "test.jpg", "test.jpg.bak");
     return {
         newCookie: config.cookie
     };
