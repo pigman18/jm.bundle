@@ -8,7 +8,7 @@ const express = require('express');
 const expressWs = require('express-ws');
 const compression = require('compression');
 
-const {writeToFileSync, isNotEmptySync, mkdirSyncIfNotExists, listFiles} = require('../../util/file');
+const {writeToFileSync, isNotEmptySync, mkdirSyncIfNotExists, listFiles, getBaseName} = require('../../util/file');
 const {getMime, cdn2OriginUrl, url2DataPath} = require('../../util/http');
 
 /** 构建时由 webpack 替换为 dist/bundles/jm.bundle/web-embedded.json；缺失或非对象时走磁盘 web/dist */
@@ -344,7 +344,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                 const id = String(req.query.number || req.query.id || '').trim();
                 const tagsRaw = String(req.query.tags || '').trim();
                 const kind = String(req.query.kind || '').trim();
-                const sort = sortMap[String(req.query.sort || 'id')] || 'id';
+                const sort = sortMap[String(req.query.sort || 'update_time')] || 'update_time';
                 const orderRaw = String(req.query.order || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
                 const parts = ['1=1'];
                 const params = {};
@@ -372,6 +372,20 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                 }
                 if (kind === 'series') {
                     parts.push("json_array_length(COALESCE(series, '[]')) > 1");
+                }
+                if (req.query.available === 'true') {
+                    const availDir = path.join(config.dataDir, 'comic');
+                    const zipIds = listFiles(availDir)
+                        .filter((f) => f.endsWith('.zip'))
+                        .map((f) => Number.parseInt(getBaseName(f)))
+                        .filter((n) => Number.isFinite(n));
+                    if (zipIds.length > 0) {
+                        const clauses = zipIds.map((_, i) => `@avail${i}`);
+                        parts.push(`id IN (${clauses.join(',')})`);
+                        zipIds.forEach((id, i) => { params[`avail${i}`] = id; });
+                    } else {
+                        parts.push('0');
+                    }
                 }
                 const where = `WHERE ${parts.join(' AND ')}`;
                 const {total, rows} = await store.comicMeta.page(params, page, pageSize, where, sort, orderRaw);

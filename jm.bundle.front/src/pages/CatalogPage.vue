@@ -35,6 +35,7 @@ const filters = reactive({
   number: '',
   tags: [] as string[],
   kind: '',
+  available: false,
   sort: 'update_time',
   order: 'desc',
   page: 1,
@@ -58,6 +59,7 @@ const queryParams = computed(() => {
     number: filters.number.trim(),
     tags,
     kind: filters.kind,
+    available: filters.available ? 'true' : undefined,
     sort: filters.sort,
     order: filters.order,
   }
@@ -76,6 +78,7 @@ function readFiltersFromRoute() {
   const ts = scalarQ(q.tags)
   filters.tags = ts ? ts.split(',').map(x => x.trim()).filter(Boolean) : []
   filters.kind = scalarQ(q.kind)
+  filters.available = q.available === 'true'
   filters.sort = scalarQ(q.sort) || 'update_time'
   filters.order = scalarQ(q.order) || 'desc'
   const p = parseInt(scalarQ(q.page), 10)
@@ -91,6 +94,7 @@ function filtersToQuery(): Record<string, string> {
   if (filters.number.trim()) q.number = filters.number.trim()
   if (filters.tags.length) q.tags = filters.tags.join(',')
   if (filters.kind) q.kind = filters.kind
+  if (filters.available) q.available = 'true'
   if (filters.sort !== 'update_time') q.sort = filters.sort
   if (filters.order !== 'desc') q.order = filters.order
   if (filters.page > 1) q.page = String(filters.page)
@@ -331,6 +335,7 @@ const orderOptions = [
           @update:value="resetPage"
         />
         <n-select v-model:value="filters.kind" placeholder="类型" clearable :options="kindOptions" @update:value="resetPage" />
+        <n-checkbox v-model:checked="filters.available" @update:checked="resetPage">仅显示本地已下载</n-checkbox>
         <n-select v-model:value="filters.sort" :options="sortOptions" @update:value="resetPage" />
         <n-select v-model:value="filters.order" :options="orderOptions" @update:value="resetPage" />
         <div class="jmz-fetch-row">
