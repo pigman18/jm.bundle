@@ -32,7 +32,7 @@ const {decideHeadersAndTs, tokenAndTokenparam, decodeRespData} = require('./mobi
  * @return {object}
  */
 function createCrawler(manifest, ctx, message, config) {
-    // 0、验证码计算错误
+    // 0、验证码错误
     // 1、获取爬虫相关域名
     let {
         host,

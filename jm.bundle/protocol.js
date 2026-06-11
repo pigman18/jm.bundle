@@ -60,15 +60,14 @@ let STATE = {
 let ERR = {
     LOGIN_NO_CREDENTIAL: {code: -10, message: '麻烦填写用户名和密码', status: 502},
     LOGIN_API_FAILED: {code: -11, message: '请求登录接口异常', status: 502},
-    LOGIN_MEIMAN_FAILED: {code: -12, message: '请求门户页异常', status: 502},
     LOGIN_EXPIRE: {code: -13, message: '登录信息过期', status: 403},
 
-    INFO_FETCH_FAILED: {code: -20, message: '拉取基本信息失败', status: 502},
-    INFO_NOT_FOUND: {code: -21, message: '漫画信息不存在', status: 301},
+    INFO_FETCH_FAILED: {code: -20, message: '元信息失败', status: 502},
+    INFO_NOT_FOUND: {code: -21, message: '漫画不存在', status: 301},
 
-    COMIC_FETCH_FAILED: {code: -30, message: '拉取漫画下载失败', status: 502},
-    COMIC_NOT_FOUND: {code: -31, message: '漫画信息不存在', status: 404},
-    RETRY_CAPTCHA_ERROR: {code: -32, message: '验证码计算错误', status: 502},
+    COMIC_FETCH_FAILED: {code: -30, message: '下载漫画失败', status: 502},
+    COMIC_NOT_FOUND: {code: -31, message: '漫画不存在', status: 404},
+    RETRY_CAPTCHA_ERROR: {code: -32, message: '验证码错误', status: 502},
     COMIC_PAY_ERROR: {code: -32, message: '收费本下载失败', status: 404},
 };
 

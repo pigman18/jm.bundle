@@ -39,8 +39,8 @@
   },
   "step": {
     "check_login_params": "检查登录参数",
-    "cloud_flare_cookie": "通过校验页",
-    "login_api": "登录接口",
+    "cloud_flare_cookie": "校验",
+    "login_api": "登录",
     "index_page": "首页",
     "download_page": "下载页",
     "captcha": "验证码",
