@@ -332,9 +332,13 @@ class JmSearchMeta {
 }
 
 let SearchSort = {
+    // 最新
     Latest: "mr",
+    // 最多点击
     View: "mv",
+    // 最多图片
     Picture: "mp",
+    // 最多爱心
     Like: "tf"
 };
 
