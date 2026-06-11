@@ -6,27 +6,37 @@
       <div id="jm-app-root">
         <header class="jmz-app-header">
           <div class="jmz-app-header-inner">
-            <n-button text size="small" class="jmz-app-back" v-if="isDetail" @click="backToCatalog">
-              <template #icon><n-icon :component="ArrowBack" /></template>
-              目录
-            </n-button>
-            <img src="/icon.ico" class="jmz-app-logo" alt="" />
-            <span class="jmz-app-title">JM</span>
-            <span class="jmz-app-badge" v-if="store.syncLocalToDb.busy">同步中</span>
-            <span class="jmz-app-badge jmz-app-badge--ok" v-if="store.syncLocalToDb.complete > 0">sync {{ store.syncLocalToDb.complete }}/{{ store.syncLocalToDb.total }}</span>
-            <template v-if="!isDetail">
-              <n-button size="tiny" quaternary @click="syncApi('local2db')" :disabled="store.syncLocalToDb.busy">
-                <template #icon><n-icon :component="CloudUploadOutline" /></template>local→库
+            <div class="jmz-header-left">
+              <n-button text size="small" class="jmz-app-back" v-if="isDetail" @click="backToCatalog">
+                <template #icon><n-icon :component="ArrowBack" /></template>
+                目录
               </n-button>
-              <n-button size="tiny" quaternary @click="syncApi('db2local')" :disabled="store.syncDbToLocal.busy">
-                <template #icon><n-icon :component="CloudDownloadOutline" /></template>库→local
+              <img src="/icon.ico" class="jmz-app-logo" alt="" />
+              <span class="jmz-app-title">JM</span>
+            </div>
+            <div class="jmz-header-center"></div>
+            <div class="jmz-header-right">
+              <template v-if="!isDetail">
+                <div class="jmz-header-sync-group">
+                  <n-button size="tiny" quaternary @click="syncApi('local2db')" :disabled="store.syncLocalToDb.busy" :loading="store.syncLocalToDb.busy">
+                    <template #icon><n-icon :component="CloudUploadOutline" /></template>
+                    <span>local→库</span>
+                  </n-button>
+                  <n-button size="tiny" quaternary @click="syncApi('db2local')" :disabled="store.syncDbToLocal.busy" :loading="store.syncDbToLocal.busy">
+                    <template #icon><n-icon :component="CloudDownloadOutline" /></template>
+                    <span>库→local</span>
+                  </n-button>
+                  <span class="jmz-header-sync-progress" v-if="store.syncLocalToDb.complete > 0 || store.syncDbToLocal.complete > 0">
+                    {{ store.syncLocalToDb.complete }}/{{ store.syncLocalToDb.total || store.syncDbToLocal.complete }}/{{ store.syncDbToLocal.total }}
+                  </span>
+                </div>
+              </template>
+              <n-button text size="small" class="jmz-header-task-btn" @click="openTasks">
+                <template #icon><n-icon :component="ListOutline" /></template>
+                <span>任务</span>
+                <span v-if="live.queueCount > 0" class="jmz-task-badge">{{ live.queueCount }}</span>
               </n-button>
-            </template>
-            <div style="flex:1;min-width:0"></div>
-            <n-button text size="small" @click="openTasks">
-              <template #icon><n-icon :component="ListOutline" /></template>任务
-              <template v-if="live.queueCount > 0">&nbsp;({{ live.queueCount }})</template>
-            </n-button>
+            </div>
           </div>
         </header>
         <main class="jmz-app-main">
@@ -135,19 +145,58 @@ onUnmounted(() => {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(30, 30, 34, 0.88);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(46, 46, 53, 0.9);
+  background: rgba(26, 26, 30, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(46, 46, 53, 0.7);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
 }
 
 .jmz-app-header-inner {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 8px 16px;
+  padding: 6px 16px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  height: 48px;
+  box-sizing: border-box;
+}
+
+.jmz-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.jmz-header-center {
+  flex: 1;
+  min-width: 0;
+}
+
+.jmz-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.jmz-header-sync-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(46, 46, 53, 0.4);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.jmz-header-sync-progress {
+  font-size: 11px;
+  color: #7a7a8a;
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .jmz-app-back {
@@ -158,29 +207,39 @@ onUnmounted(() => {
 }
 
 .jmz-app-logo {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
   flex-shrink: 0;
 }
 .jmz-app-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
   color: #e0e0e6;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
-.jmz-app-badge {
+.jmz-header-task-btn {
+  color: #9b9bb4 !important;
+}
+.jmz-header-task-btn:hover {
+  color: #e0e0e6 !important;
+}
+
+.jmz-task-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
   font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: #2e2e35;
-  color: #c4c4d6;
-}
-
-.jmz-app-badge--ok {
-  background: #1a3a2a;
-  color: #5ee0a0;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 2px;
 }
 
 .jmz-app-main {
