@@ -34,6 +34,8 @@ const cachedCategory = ref('')
 const cachedType = ref('')
 const scrollTop = ref(0)
 
+const coverLoaded = reactive<Record<number, boolean>>({})
+
 let _syncingUrl = false
 
 // 从 URL 恢复参数
@@ -46,8 +48,6 @@ watch(() => route.query, (q) => {
   activeType.value = typ || ''
   if (!cachedList.value.length) loadComics()
 }, { immediate: true })
-
-const coverLoaded = reactive<Record<number, boolean>>({})
 
 function cardToneClass(index: number) { return `tone-${(index % 4) + 1}` }
 
@@ -99,9 +99,6 @@ async function loadWeekInfo() {
     })
     if (categories.value.length && !activeCategory.value) {
       activeCategory.value = categories.value[0].id
-      _syncingUrl = true
-      try { router.replace({ name: 'week', query: { category: activeCategory.value } }) } catch {}
-      _syncingUrl = false
       loadComics()
     }
   } catch (e: any) {
@@ -172,6 +169,7 @@ async function goDetail(c: Comic) {
 <template>
   <div class="jmz-page jmz-week-page">
     <section class="jmz-panel jmz-panel--pad jmz-week-bar">
+      <div class="jmz-week-bar-track-wrap">
       <div class="jmz-week-categories">
         <n-select
           v-model:value="activeCategory"
@@ -193,6 +191,9 @@ async function goDetail(c: Comic) {
           {{ t.title }}
         </button>
       </div>
+      <div v-if="loading" class="jmz-week-bar-track"><div class="jmz-week-bar-fill" /></div>
+      </div>
+      <div v-if="loading" class="jmz-week-bar-indicator">加载中...</div>
     </section>
 
     <div class="jmz-week-main">
@@ -274,6 +275,39 @@ async function goDetail(c: Comic) {
   margin-bottom: 16px;
 }
 
+.jmz-week-bar {
+  position: relative;
+}
+.jmz-week-bar-track-wrap {
+  position: relative;
+}
+.jmz-week-bar-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: rgba(46, 46, 53, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.jmz-week-bar-fill {
+  height: 100%;
+  width: 25%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6);
+  background-size: 200% 100%;
+  animation: jmz-cat-bar-slide 1s linear infinite;
+}
+@keyframes jmz-cat-bar-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.jmz-week-bar-indicator {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 600;
+}
 .jmz-week-categories {
   margin-bottom: 12px;
 }

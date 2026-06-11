@@ -23,6 +23,7 @@ const categories = shallowRef<CatItem[]>([])
 const blocks = shallowRef<BlockItem[]>([])
 const activeTab = ref('')
 const loading = ref(false)
+const infoLoading = ref(false)
 const fetching = ref<Record<number, boolean>>({})
 const list = shallowRef<Comic[]>([])
 const total = ref(0)
@@ -114,6 +115,7 @@ onActivated(() => {
 })
 
 async function loadInfo() {
+  infoLoading.value = true
   try {
     const j = await getJson('/category/info')
     if (!j.ok) throw new Error(j.message || '获取分类失败')
@@ -129,6 +131,8 @@ async function loadInfo() {
     }
   } catch (e: any) {
     message.error(e.message || '获取分类信息失败')
+  } finally {
+    infoLoading.value = false
   }
 }
 
@@ -206,16 +210,24 @@ async function goDetail(c: Comic) {
 
 <template>
   <div class="jmz-page jmz-cat-page">
-    <section class="jmz-panel jmz-panel--pad jmz-cat-bar">
+    <div v-if="infoLoading && !categories.length" class="jmz-cat-init-loading">
+      <n-spin size="medium" />
+      <span>加载中...</span>
+    </div>
+    <template v-else>
+    <section class="jmz-panel jmz-panel--pad jmz-cat-bar" :class="{ 'jmz-cat-bar--loading': loading }">
       <div class="jmz-cat-tabs">
         <button
           v-for="t in tabOptions"
           :key="t.value"
           class="jmz-cat-tab"
           :class="{ 'jmz-cat-tab--active': t.value === activeTab }"
+          :disabled="loading"
           @click="onTabClick(t.value)"
         >{{ t.label }}</button>
       </div>
+      <div v-if="loading" class="jmz-cat-bar-track"><div class="jmz-cat-bar-fill" /></div>
+      <div v-if="loading" class="jmz-cat-bar-indicator">加载中...</div>
     </section>
 
     <!-- 分类 tab: 显示 blocks 标签 -->
@@ -320,11 +332,23 @@ async function goDetail(c: Comic) {
         <div v-if="total > 0" class="jmz-cat-info">共 {{ total }} 条</div>
       </div>
     </template>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .jmz-cat-page {
+}
+
+.jmz-cat-init-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 0;
+  color: #7a7a8a;
+  font-size: 14px;
 }
 
 .jmz-cat-bar {
@@ -334,7 +358,49 @@ async function goDetail(c: Comic) {
 .jmz-cat-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
+  background: rgba(30, 30, 36, 0.6);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid rgba(46, 46, 53, 0.5);
+}
+.jmz-cat-bar {
+  position: relative;
+}
+.jmz-cat-bar--loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+.jmz-cat-bar-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(46, 46, 53, 0.3);
+  overflow: hidden;
+}
+.jmz-cat-bar-fill {
+  height: 100%;
+  width: 25%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6);
+  background-size: 200% 100%;
+  animation: jmz-cat-bar-slide 1s linear infinite;
+}
+@keyframes jmz-cat-bar-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.jmz-cat-bar-indicator {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 600;
+}
+.jmz-cat-tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .jmz-cat-tab {
@@ -363,27 +429,41 @@ async function goDetail(c: Comic) {
 }
 
 .jmz-cat-block {
-  margin-bottom: 16px;
+  background: rgba(26, 26, 32, 0.5);
+  border: 1px solid rgba(46, 46, 53, 0.6);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
 }
 .jmz-cat-block:last-child {
   margin-bottom: 0;
 }
 
 .jmz-cat-block-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #c4c4d6;
-  margin: 0 0 8px 0;
+  color: #b0b0c4;
+  margin: 0 0 10px 0;
+  letter-spacing: 0.03em;
 }
 
 .jmz-cat-block-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 .jmz-cat-block-tags .jmz-chip {
-  font-size: 13px;
-  padding: 6px 12px;
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 5px;
+  background: rgba(42, 42, 50, 0.7);
+  border-color: rgba(53, 53, 61, 0.6);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.jmz-cat-block-tags .jmz-chip--click:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
 }
 
 /* filter bar */
