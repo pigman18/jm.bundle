@@ -12,6 +12,7 @@ export interface Comic {
   addtime?: string
   description?: string
   canRead?: boolean
+  inStore?: boolean
   series?: ComicSeries[]
 }
 

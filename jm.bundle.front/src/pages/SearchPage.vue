@@ -169,6 +169,9 @@ function onCoverErr(e: Event, id: number) {
             <div v-if="fetching[c.id]" class="jmz-card-fetching-mask">
               <n-spin size="small" />
             </div>
+            <div v-if="c.inStore" class="jmz-card-ribbon">已收录</div>
+            <div v-else class="jmz-card-ribbon jmz-card-ribbon--new">未收录</div>
+            <span v-if="c.canRead" class="jmz-card-ribbon jmz-card-ribbon--read">可读</span>
             <img
               class="jmz-card-cover"
               :class="{ 'jmz-card-cover--show': coverReady(c.id, c.cover) }"
@@ -290,10 +293,38 @@ function onCoverErr(e: Event, id: number) {
   justify-content: center;
 }
 
+.jmz-card-ribbon {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  background: rgba(37, 99, 235, 0.85);
+  color: #fff;
+  pointer-events: none;
+}
+
+.jmz-card-ribbon--new {
+  background: rgba(80, 80, 90, 0.75);
+  color: #b0b0c0;
+}
+
+.jmz-card-ribbon--read {
+  left: auto;
+  right: 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 .jmz-card-fetching-mask {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;

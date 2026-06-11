@@ -95,11 +95,15 @@ async function connectByPuppeteerRealBrowser(proxy) {
         headless: 'new',
         plugins: [
             require("puppeteer-extra-plugin-stealth")(),
-            require("puppeteer-extra-plugin-human-typing")()
+            require("puppeteer-extra-plugin-human-typing")(),
+            require("puppeteer-extra-plugin-anonymize-ua")()
         ],
         args: [
             `--proxy-server=${proxy}`,
             `--window-size=${width},${height}`,
+            '--enable-unsafe-swiftshader',
+            '--ignore-gpu-blocklist',
+            ' --disable-web-security',
             '--lang=zh-CN',                                    // 设置语言
             '--timezone=Asia/Shanghai',                        // 时区（部分版本
             '--force-device-scale-factor=1',                   // 强制 DPR
@@ -120,7 +124,6 @@ async function connectByPuppeteerRealBrowser(proxy) {
             // 禁用“登录 Chrome / 同步”类的促销与询问
             "--disable-signin-promo",
             "--disable-sync",
-            '--disable-gpu',
             '--disable-software-rasterizer',
             '--disable-dev-shm-usage',
             '--disable-extensions',
@@ -128,7 +131,7 @@ async function connectByPuppeteerRealBrowser(proxy) {
             // '--disable-extensions',
             '--disable-bookmark-bar',
             '--window-position=center',
-            '--app=about:blank',        // ✅ 去掉地址栏（Chromium app mode）,
+            '--app=https://18comic.vip/login',        // ✅ 去掉地址栏（Chromium app mode）,
         ],
     });
     await page.setViewport({
@@ -142,10 +145,6 @@ async function connectByPuppeteerRealBrowser(proxy) {
             }
         });
     });
-    let navigator = await page.evaluate({} , () => {
-        return window?.navigator;
-    });
-    console.log(navigator);
     return {
         browser,
         page
