@@ -60,6 +60,9 @@ onActivated(() => {
     list.value = cachedList.value
     total.value = cachedTotal.value
     pages.value = cachedPages.value
+    _syncingUrl = true
+    try { router.replace({ name: 'search', query: { keyword: keyword.value, sort: sort.value, page: String(currentPage.value) } }) } catch {}
+    _syncingUrl = false
     setTimeout(() => window.scrollTo(0, scrollTop.value), 0)
   }
 })

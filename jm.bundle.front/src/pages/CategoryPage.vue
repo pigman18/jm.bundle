@@ -108,6 +108,7 @@ onActivated(() => {
     timeFilter.value = cachedTime.value
     sortFilter.value = cachedSort.value
     currentPage.value = cachedPageNum.value
+    syncUrl()
     setTimeout(() => window.scrollTo(0, scrollTop.value), 0)
   } else if (!categories.value.length) {
     loadInfo()

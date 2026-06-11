@@ -80,6 +80,7 @@ onActivated(() => {
     total.value = cachedTotal.value
     activeCategory.value = cachedCategory.value
     activeType.value = cachedType.value
+    syncUrl()
     setTimeout(() => window.scrollTo(0, scrollTop.value), 0)
   } else if (!categories.value.length) {
     loadWeekInfo()
