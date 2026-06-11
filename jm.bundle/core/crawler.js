@@ -1203,10 +1203,12 @@ function createCrawler(manifest, ctx, message, config) {
          * @returns {Promise<{total: *, list: JmSearchMeta[]}>}
          */
         weekly: async (categoryId, typeId) => {
-            let resp = await reqApi(`${ApiPath.GetWeekly}?${toQueryString({
-                "id": categoryId,
-                "type": typeId
-            })}`);
+            let resp = await expireRetry(async () => {
+                return await reqApi(`${ApiPath.GetWeekly}?${toQueryString({
+                    "id": categoryId,
+                    "type": typeId
+                })}`);
+            });
             let {
                 total,
                 list
@@ -1217,80 +1219,46 @@ function createCrawler(manifest, ctx, message, config) {
             }
         },
         /**
-         * 获取每月必看期数（todo api接口是错的）
-         * @returns {Promise<{JmWeekInfo}>}
+         * 分类与排行
          */
-        monthInfo: async() => {
+        categories: async () => {
             return expireRetry(async () => {
-                return await reqApi(ApiPath.GetMonthlyInfo);
+                return await reqApi(ApiPath.GetCategories);
             });
         },
         /**
-         * 获取每月必看（todo api接口是错的）
-         * @param categoryId
-         * @param typeId
-         * @returns {Promise<{total: *, list: JmSearchMeta[]}>}
+         * 获取分类
+         * @param page      页码
+         * @param time      时间段，t今天、w本周、m本月、a全部
+         * @param category  分类
+         * @param order_by  排序  mr最新、mv最多观看、mp最多图片、tr总排行、md最多评论、tf最多爱心
+         * @param sub_category  子分类（暂不支持）
+         * @returns {Promise<void>}
          */
-        monthly: async (categoryId, typeId) => {
-            let resp = await reqApi(`${ApiPath.GetMonthly}?${toQueryString({
-                "id": categoryId,
-                "type": typeId
-            })}`);
+        categoriesFilter: async (page, time, category, order_by, sub_category) => {
+            // 移动端不支持 sub_category
+            // o: mv, mv_m, mv_w, mv_t
+            let o = 'a' !== time
+                ? `${order_by}_${time}`
+                : order_by;
+            let resp = await expireRetry(async () => {
+                return await reqApi(`${ApiPath.getCategoriesFilter}?${toQueryString({
+                    'page': page,
+                    'order': '',  // 该参数为空
+                    'c': category,
+                    'o': o
+                })}`);
+            });
             let {
                 total,
-                list
+                content
             } = resp;
             return {
                 total,
-                list
+                content,
+                // pageSize固定为80，手动计算总页数
+                pages: Math.ceil(total / 80)
             }
-        },
-        // 每周最新连载
-        serials: async () => {
-            let all = {
-                "SERIALIZATION_0": {
-                    "label": "每周連載更新（已完结）",
-                    "url": "https://18comic.vip/serialization/0"
-                },
-                "SERIALIZATION_1": {
-                    "label": "每周連載更新（周一）",
-                    "url": "https://18comic.vip/serialization/1"
-                },
-                "SERIALIZATION_2": {
-                    "label": "每周連載更新（周二）",
-                    "url": "https://18comic.vip/serialization/2"
-                },
-                "SERIALIZATION_3": {
-                    "label": "每周連載更新（周三）",
-                    "url": "https://18comic.vip/serialization/3"
-                },
-                "SERIALIZATION_4": {
-                    "label": "每周連載更新（周四）",
-                    "url": "https://18comic.vip/serialization/4"
-                },
-                "SERIALIZATION_5": {
-                    "label": "每周連載更新（周五）",
-                    "url": "https://18comic.vip/serialization/5"
-                },
-                "SERIALIZATION_6": {
-                    "label": "每周連載更新（周六）",
-                    "url": "https://18comic.vip/serialization/6"
-                },
-                "SERIALIZATION_7": {
-                    "label": "每周連載更新（周日）",
-                    "url": "https://18comic.vip/serialization/7"
-                }
-            };
-            let list = [];
-            for (let key in all) {
-                let c = all[key];
-                await expireRetry(async () => {
-                    await listSerialsAlbums(c.url, c.label, (pageInfo) => {
-                        list.push(...(pageInfo.list || []));
-                    });
-                })
-            }
-            return list;
         }
     };
 
