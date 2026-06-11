@@ -359,6 +359,9 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                 if (id) {
                     parts.push('CAST(id AS TEXT) LIKE @i');
                     params.i = `%${id}%`;
+                } else {
+                    // 默认只显示主作品，不显示系列子项
+                    parts.push("(series_id IS NULL OR series_id = '' OR series_id = '0' OR series_id = id)");
                 }
                 if (tagsRaw) {
                     tagsRaw.split(',').forEach((tag, i) => {
@@ -437,6 +440,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                     cover: comic.cover || '',
                     series: allSeries,
                     allDone,
+                    tags: comic.tags || [],
                 });
             } catch (e) {
                 res.status(500).json({ok: false, message: String(e.message || e)});
@@ -472,6 +476,8 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                 const name = String(req.body.title || req.body.name || '');
                 const episodeName = String(req.body.episodeTitle || req.body.episodeName || '');
                 const downloadLabel = String(req.body.downloadLabel || '').slice(0, 240);
+                const tagsBody = req.body.tags;
+                const comicTags = Array.isArray(tagsBody) ? tagsBody.filter(Boolean).map(String) : [];
                 const withMeta = req.body.withMeta !== false;
 
                 // 构建展示标题
@@ -508,7 +514,8 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                         } catch (_) {
                         }
                     };
-                    const result = await taskManager.addTask(n, [album.toString(), downloadLabel].filter(Boolean), {
+                    const taskLabels = name ? [name, ...comicTags] : [album.toString(), downloadLabel].filter(Boolean);
+                    const result = await taskManager.addTask(n, taskLabels, {
                         coverBase64,
                         displayTitle,
                         episodeNumber: n,

@@ -209,6 +209,19 @@ async function onRead(row: ZipRow) {
 
 function backToCatalog() { router.push({ name: 'catalog', query: peekCatalogReturnQuery() }) }
 
+function fmtTime(ts: string | undefined): string {
+  if (!ts) return ''
+  const n = Number(ts)
+  if (!Number.isFinite(n)) return ts
+  const d = new Date(n * 1000)
+  const Y = d.getFullYear()
+  const M = String(d.getMonth() + 1).padStart(2, '0')
+  const D = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${Y}-${M}-${D} ${h}:${m}`
+}
+
 function filterByTag(t: string, ev?: Event) {
   ev?.stopPropagation?.()
   router.replace({ name: 'catalog', query: { ...peekCatalogReturnQuery(), tags: String(t), page: '1' } })
@@ -231,7 +244,7 @@ const asideRows = computed(() => {
   }
   push('浏览', c.total_views)
   push('点赞', c.likes)
-  push('时间', c.addtime)
+  push('时间', c.addtime ? fmtTime(c.addtime) : '')
   push('作者', c.author?.join(', '))
   return rows
 })
@@ -274,7 +287,7 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
           <section class="jmz-panel jmz-panel--pad">
             <div class="jmz-zip-head">
               <h2 class="jmz-block-title">ZIP / 阅读</h2>
-              <n-checkbox v-model:checked="withMeta" size="small" class="jmz-zip-meta">添加元信息</n-checkbox>
+              <n-checkbox v-model:checked="withMeta" size="small" class="jmz-zip-meta">附带作品信息</n-checkbox>
               <n-button v-if="showDownloadAll" type="primary" @click="downloadAllMissing" class="jmz-zip-dlall">全部下载</n-button>
             </div>
             <div v-if="zipRows.length" class="jmz-zip-table">

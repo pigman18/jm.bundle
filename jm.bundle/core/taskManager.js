@@ -182,15 +182,18 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
     saveTasks();
     broadcast({ type: 'started', id: task.id, task: { status: 'downloading', stepStatus: stepStatusLabel(task.step, task.stepState, stepLabels, task.payload) } });
 
-    // 没有 displayTitle（批量添加）且 withMeta 时先取元信息
-    if (task.withMeta && !task.displayTitle) {
+    // 有 withMeta 时用元信息补充标签，无 displayTitle 时再补 name / cover
+    if (task.withMeta) {
       try {
         const meta = await crawler.album.getMeta(task.number);
-        const fields = {};
         if (meta && meta.name) {
-          fields.name = `JM${task.number}: ${meta.name}`;
+          const fields = {};
+          if (!task.displayTitle) {
+            fields.name = `JM${task.number}: ${meta.name}`;
+          }
+          // 把 name 和 tags 追加到标签
           fields.labels = [meta.name, ...(meta.tags || [])];
-          if ((meta.images && meta.images[0]) && !task.coverBase64) {
+          if (!task.coverBase64 && meta.images && meta.images[0]) {
             try {
               const resp = await crawler.httpClient.get(meta.cover, { responseType: 'arraybuffer', timeout: 5000 });
               if (resp && resp.data) {

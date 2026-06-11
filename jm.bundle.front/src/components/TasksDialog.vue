@@ -66,7 +66,7 @@
                   <span v-if="ep.done" style="margin-left:auto;flex-shrink:0;display:flex"><n-tag type="success" size="small">已完成</n-tag></span>
                 </div>
               </div>
-              <n-checkbox v-model:checked="withMeta" size="small" style="margin-top:10px">添加元信息</n-checkbox>
+              <n-checkbox v-model:checked="withMeta" size="small" style="margin-top:10px">附带作品信息</n-checkbox>
             </template>
           </template>
 
@@ -79,7 +79,7 @@
               <input ref="fileInput" type="file" accept=".txt,text/plain" style="display:none" @change="onFilePicked" />
               <span v-if="batchCount" class="jmt-batch-count">共解析到 {{ batchCount }} 个编号</span>
             </n-space>
-            <n-checkbox v-model:checked="withMetaBatch" size="small" style="margin-top:10px">添加元信息</n-checkbox>
+            <n-checkbox v-model:checked="withMetaBatch" size="small" style="margin-top:10px">附带作品信息</n-checkbox>
           </template>
         </n-form>
       </template>
@@ -153,6 +153,7 @@ interface FetchedInfo {
   cover: string
   series: SeriesInfo[]
   allDone?: boolean
+  tags?: string[]
 }
 
 const fetchedInfo = ref<FetchedInfo | null>(null)
@@ -202,7 +203,7 @@ function getQueryPayload() {
     ? info.series.filter(e => epChecked[e.id])
     : info.allDone ? []
     : [{ id: String(info.id), name: '' }]
-  return { type: 'query', number: info.id, episodes: eps, cover: info.cover, title: info.name, withMeta: withMeta.value }
+  return { type: 'query', number: info.id, episodes: eps, cover: info.cover, title: info.name, tags: info.tags, withMeta: withMeta.value }
 }
 
 // --- 批量添加 ---
@@ -266,7 +267,7 @@ function getAddPayload() {
 
 async function handleAdd(payload: any) {
   if (payload.type === 'query') {
-    const { number, episodes, cover, title, withMeta } = payload
+    const { number, episodes, cover, title, tags, withMeta } = payload
     for (const ep of episodes) {
       await postJson(`/comics/${number}/download`, {
         episodeNumber: Number(ep.id),
@@ -274,6 +275,7 @@ async function handleAdd(payload: any) {
         coverUrl: cover,
         title,
         episodeTitle: ep.name,
+        tags,
         withMeta,
       })
     }

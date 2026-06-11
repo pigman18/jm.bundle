@@ -184,6 +184,19 @@ function goDetail(c: Comic) {
   router.push({ name: 'detail', params: { num: String(c.id) } })
 }
 
+function fmtTime(ts: string | undefined): string {
+  if (!ts) return ''
+  const n = Number(ts)
+  if (!Number.isFinite(n)) return ts
+  const d = new Date(n * 1000)
+  const Y = d.getFullYear()
+  const M = String(d.getMonth() + 1).padStart(2, '0')
+  const D = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${Y}-${M}-${D} ${h}:${m}`
+}
+
 function filterByTag(t: string, ev?: Event) {
   ev?.stopPropagation?.()
   const tags = new Set(filters.tags || [])
@@ -422,7 +435,7 @@ const orderOptions = [
                 <span v-if="!tagsLine(c).length && !tagsMore(c)" class="jmz-chip jmz-chip--ghost">无标签</span>
               </div>
               <div class="jmz-card-dates">
-                <span v-if="c.addtime" class="jmz-date"><b>添加</b> {{ c.addtime }}</span>
+                <span v-if="c.addtime" class="jmz-date"><b>添加</b> {{ fmtTime(c.addtime) }}</span>
                 <span v-if="!c.addtime" class="jmz-date jmz-date--muted">日期未收录</span>
               </div>
               <div class="jmz-card-foot">
