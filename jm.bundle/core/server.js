@@ -700,7 +700,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                 const afterSteps = async ({file}) => {
                     if (!withMeta) return;
                     try {
-                        const albumInfo = await crawler.album.getMeta(num);
+                        const albumInfo = await crawler.comic.getMeta(num);
                         if (albumInfo) await crawler.comic.appendComicInfo2Archive(albumInfo, file);
                     } catch (_) {
                     }

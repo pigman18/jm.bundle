@@ -176,7 +176,7 @@ async function connectByPuppeteerRealBrowser(proxy) {
         width: width,
         height: height
     });
-    hideAllChromeWindows();
+    // hideAllChromeWindows();
     return {
         browser,
         page

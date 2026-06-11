@@ -185,7 +185,7 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
     // 有 withMeta 时用元信息补充标签，无 displayTitle 时再补 name / cover
     if (task.withMeta) {
       try {
-        const meta = await crawler.album.getMeta(task.number);
+        const meta = await crawler.comic.getMeta(task.number);
         if (meta && meta.name) {
           const fields = {};
           if (!task.displayTitle) {
@@ -193,9 +193,11 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
           }
           // 把 name 和 tags 追加到标签
           fields.labels = [meta.name, ...(meta.tags || [])];
-          if (!task.coverBase64 && meta.images && meta.images[0]) {
+          if (!task.coverBase64) {
             try {
-              const resp = await crawler.httpClient.get(meta.cover, { responseType: 'arraybuffer', timeout: 5000 });
+              let cdnHost = config.cdnHosts[Math.floor(Math.random() * config.cdnHosts.length)];
+              meta.cover = meta.cover || `${cdnHost}/media/albums/${task.id}.jpg`;
+              const resp = await crawler.httpClient.get(meta.cover || re, { responseType: 'arraybuffer', timeout: 5000 });
               if (resp && resp.data) {
                 const buf = Buffer.from(resp.data);
                 const mime = resp.headers['content-type'] || 'image/jpeg';
