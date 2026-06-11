@@ -192,33 +192,35 @@ onUnmounted(() => {
 
 .jmz-header-tabs {
   display: flex;
-  gap: 4px;
-  background: rgba(46, 46, 53, 0.4);
+  gap: 2px;
+  background: rgba(30, 30, 36, 0.6);
   border-radius: 8px;
-  padding: 2px;
+  padding: 3px;
+  border: 1px solid rgba(46, 46, 53, 0.5);
 }
 
 .jmz-tab {
   display: inline-flex;
   align-items: center;
-  padding: 4px 14px;
-  border-radius: 6px;
+  padding: 5px 16px;
+  border-radius: 5px;
   font-size: 13px;
   font-weight: 600;
-  color: #9b9bb4;
+  color: #7a7a8a;
   text-decoration: none;
-  transition: all 0.15s;
+  transition: all 0.2s;
   cursor: pointer;
+  letter-spacing: 0.02em;
 }
 
 .jmz-tab:hover {
   color: #c4c4d6;
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .jmz-tab--active {
   color: #e0e0e6;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .jmz-header-right {
