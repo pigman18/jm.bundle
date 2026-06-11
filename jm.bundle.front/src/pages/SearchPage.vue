@@ -185,7 +185,7 @@ function onCoverErr(e: Event, id: number) {
             />
           </div>
           <div class="jmz-card-body">
-            <div class="jmz-card-num">#{{ c.id }}</div>
+            <div class="jmz-card-num">JM{{ c.id }}</div>
             <h2 class="jmz-card-title">{{ c.name }}</h2>
             <div v-if="c.author && c.author[0]" class="jmz-card-author">{{ c.author[0] }}</div>
             <div v-else class="jmz-card-author jmz-card-author--muted">作者未知</div>

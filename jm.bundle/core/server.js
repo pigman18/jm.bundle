@@ -421,7 +421,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                 const n = Math.floor(Number(req.params.num));
                 const info = await crawler.comic.getMeta(n);
                 if (!info) {
-                    res.json({ok: false, message: '无可用信息或编号无效'});
+                    res.json({ok: false, message: '无可用信息或 JM 编码无效'});
                     return;
                 }
                 await store.comicMeta.saveOrUpdate(store.jsonRowToDb(info));
@@ -590,7 +590,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
             try {
                 const num = Math.floor(Number(req.params.num));
                 if (!Number.isFinite(num)) {
-                    res.json({ok: false, message: '无效编号'});
+                    res.json({ok: false, message: '无效 JM 编码'});
                     return;
                 }
                 const withMeta = req.body.withMeta !== false;

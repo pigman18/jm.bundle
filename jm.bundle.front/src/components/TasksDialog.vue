@@ -12,8 +12,8 @@
         <div class="jmt-name-cell">
           <img v-if="task.coverBase64" class="jmt-name-thumb" :src="task.coverBase64" alt="" />
           <div class="jmt-name-lines">
-            <span v-if="task.status === 'completed'" class="jmt-name-text jmt-name-link" @click.stop="readComic(task)">{{ task.name || `#${task.number}` }}</span>
-            <span v-else class="jmt-name-text">{{ task.name || `#${task.number}` }}</span>
+            <span v-if="task.status === 'completed'" class="jmt-name-text jmt-name-link" @click.stop="readComic(task)">{{ task.name || `JM${task.number}` }}</span>
+            <span v-else class="jmt-name-text">{{ task.name || `JM${task.number}` }}</span>
           </div>
         </div>
       </template>
@@ -37,8 +37,8 @@
           </n-radio-group>
 
           <template v-if="mode === 'query'">
-            <n-form-item label="漫画编号" required>
-              <n-input v-model:value="addNumber" placeholder="输入漫画编号" :disabled="addLoading" @keyup.enter="fetchInfo" />
+            <n-form-item label="JM 编码" required>
+              <n-input v-model:value="addNumber" placeholder="输入 JM 编码" :disabled="addLoading" @keyup.enter="fetchInfo" />
             </n-form-item>
             <n-button size="small" @click="fetchInfo" :loading="addLoading" :disabled="!addNumber.trim()">查询</n-button>
             <template v-if="fetchedInfo">
@@ -46,8 +46,8 @@
                 <img v-if="fetchedInfo.cover" class="jmt-add-cover" :src="fetchedInfo.cover" alt="" />
                 <div class="jmt-add-detail">
                   <div class="jmt-add-title">
-                    <span v-if="fetchedInfo.allDone" class="jmt-name-link" @click="readNumber(fetchedInfo.id)">#{{ fetchedInfo.id }} {{ fetchedInfo.name }}</span>
-                    <span v-else>#{{ fetchedInfo.id }} {{ fetchedInfo.name }}</span>
+                    <span v-if="fetchedInfo.allDone" class="jmt-name-link" @click="readNumber(fetchedInfo.id)">JM{{ fetchedInfo.id }} {{ fetchedInfo.name }}</span>
+                    <span v-else>JM{{ fetchedInfo.id }} {{ fetchedInfo.name }}</span>
                   </div>
                   <n-tag v-if="fetchedInfo.allDone" type="success" size="small">已完成</n-tag>
                   <div v-else-if="fetchedInfo.series.length > 1" class="jmt-add-ep-label">{{ fetchedInfo.series.length }} 话</div>
@@ -60,7 +60,7 @@
                 </div>
                 <div v-for="ep in fetchedInfo.series" :key="ep.id" class="jmt-ep-row">
                   <n-checkbox v-model:checked="epChecked[ep.id]" />
-                  <span class="jmt-ep-num">#{{ ep.id }}</span>
+                  <span class="jmt-ep-num">JM{{ ep.id }}</span>
                   <span v-if="ep.done" class="jmt-ep-title jmt-name-link" @click="readNumber(Number(ep.id))">{{ ep.name }}</span>
                   <span v-else class="jmt-ep-title">{{ ep.name }}</span>
                   <span v-if="ep.done" style="margin-left:auto;flex-shrink:0;display:flex"><n-tag type="success" size="small">已完成</n-tag></span>
@@ -71,13 +71,13 @@
           </template>
 
           <template v-else>
-            <n-form-item label="漫画编号（每行一个，支持标题行）">
+            <n-form-item label="JM 编码（每行一个，支持标题行）">
               <n-input v-model:value="batchText" type="textarea" placeholder="501488&#10;五：玩10把街霸6，25分钟吃了77个指令投&#10;501489&#10;501490" :rows="6" />
             </n-form-item>
             <n-space>
               <n-button size="small" @click="pickFile">选择文件</n-button>
               <input ref="fileInput" type="file" accept=".txt,text/plain" style="display:none" @change="onFilePicked" />
-              <span v-if="batchCount" class="jmt-batch-count">共解析到 {{ batchCount }} 个编号</span>
+              <span v-if="batchCount" class="jmt-batch-count">共解析到 {{ batchCount }} 个 JM 编码</span>
             </n-space>
             <n-checkbox v-model:checked="withMetaBatch" size="small" style="margin-top:10px">附带作品信息</n-checkbox>
           </template>
@@ -118,7 +118,7 @@ const { openComic } = useZipReader()
 const taskManagerTasks = computed<TmTaskItem[]>(() =>
   tasksStore.tasks.map(t => ({
     id: t.id,
-    name: t.name || t.displayTitle || `#${t.number}`,
+    name: t.name || t.displayTitle || `JM${t.number}`,
     url: String(t.number),
     status: t.status as TmTaskItem['status'],
     progress: t.progress,
@@ -308,11 +308,11 @@ function handlePause(ids: number[]) {
 async function readComic(task: any) {
   const n = task.number
   if (!n) return
-  openComic(n, String(n), task.name || `#${n}`)
+  openComic(n, String(n), task.name || `JM${n}`)
 }
 function readNumber(n: number) {
   if (!n) return
-  openComic(n, String(n), `#${n}`)
+  openComic(n, String(n), `JM${n}`)
 }
 </script>
 

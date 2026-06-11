@@ -240,7 +240,7 @@ const fetchBusy = ref(false)
 
 async function fetchByNumber() {
   const n = Math.floor(Number(fetchNum.value))
-  if (!Number.isFinite(n) || n < 1) { message.warning('请输入有效漫画编号'); return }
+    if (!Number.isFinite(n) || n < 1) { message.warning('请输入有效 JM 编码'); return }
   fetchBusy.value = true
   try {
     const j = await postJson(`/comics/${n}/fetch-meta`)
@@ -311,7 +311,7 @@ const kindOptions = [
   { label: '多集', value: 'series' },
 ]
 const sortOptions = [
-  { label: '编号', value: 'id' },
+  { label: 'JM 编码', value: 'id' },
   { label: '标题', value: 'name' },
   { label: '浏览', value: 'total_views' },
   { label: '点赞', value: 'likes' },
@@ -332,7 +332,7 @@ const orderOptions = [
           <template #prefix><n-icon :component="SearchOutline" /></template>
         </n-input>
         <n-input v-model:value="filters.author" clearable placeholder="作者（精确）" @clear="resetPage" @keyup.enter="resetPage" />
-        <n-input v-model:value="filters.number" clearable placeholder="编号" @clear="resetPage" @keyup.enter="resetPage" />
+        <n-input v-model:value="filters.number" clearable placeholder="JM 编码" @clear="resetPage" @keyup.enter="resetPage" />
         <n-select
           v-model:value="filters.tags"
           multiple
@@ -352,7 +352,7 @@ const orderOptions = [
         <n-select v-model:value="filters.sort" :options="sortOptions" @update:value="resetPage" />
         <n-select v-model:value="filters.order" :options="orderOptions" @update:value="resetPage" />
         <div class="jmz-fetch-row">
-          <n-input v-model:value="fetchNum" placeholder="站点编号拉取入库" clearable @keyup.enter="fetchByNumber" />
+          <n-input v-model:value="fetchNum" placeholder="JM 编码拉取入库" clearable @keyup.enter="fetchByNumber" />
           <n-button type="primary" :loading="fetchBusy" @click="fetchByNumber">拉取</n-button>
           <n-button type="primary" :loading="loading" @click="resetPage">搜索</n-button>
         </div>
@@ -410,7 +410,7 @@ const orderOptions = [
               <span v-if="c.canRead" class="jmz-card-ribbon">可读</span>
             </div>
             <div class="jmz-card-body">
-              <div class="jmz-card-num">#{{ c.id }}</div>
+              <div class="jmz-card-num">JM{{ c.id }}</div>
               <h2 class="jmz-card-title">{{ c.name }}</h2>
               <div
                 v-if="c.author && c.author[0]"

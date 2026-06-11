@@ -104,7 +104,7 @@ const zipRows = computed<ZipRow[]>(() => {
     const st = z[sk] || {}
     const ep = eps?.find(e => Number(e.id) === num)
     const siteName = (ep ? String(ep.name ?? '') : String(c.name ?? '')).trim()
-    const zipLabel = `#${num}`
+    const zipLabel = `JM${num}`
     return { zipKey: sk, num, zipLabel, epTitle: siteName, label: [zipLabel, siteName].filter(Boolean).join(' '), st }
   })
 })
@@ -269,7 +269,7 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
             </div>
             <div class="jmz-detail-meta">
               <h1 class="jmz-detail-title">{{ comic.name }}</h1>
-              <p class="jmz-detail-line">#{{ comic.id }} · {{ comic.displayKindLabel }}</p>
+              <p class="jmz-detail-line">JM{{ comic.id }} · {{ comic.displayKindLabel }}</p>
               <p v-if="comic.author && comic.author[0]" class="jmz-detail-line">
                 <span class="jmz-detail-author-label">作者：</span>
                 <span class="jmz-author-link" role="link" tabindex="0" @click="filterByAuthor(comic.author[0], $event)" @keyup.enter="filterByAuthor(comic.author[0], $event)">{{ comic.author[0] }}</span>
