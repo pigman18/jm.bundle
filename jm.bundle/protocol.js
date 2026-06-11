@@ -75,9 +75,158 @@ let ERR = {
     COMIC_PAY_ERROR: {code: -32, message: '收费本下载失败', status: 404},
 };
 
+/**
+ * 漫画元信息
+ */
+class JmMeta {
+    /**
+     * 漫画ID
+     * @type {string|number}
+     */
+    id;
+
+    /**
+     * 漫画名称
+     * @type {string}
+     */
+    name;
+
+    /**
+     * 封面图列表
+     * @type {string[]}
+     */
+    images;
+
+    /**
+     * 添加时间（Unix时间戳）
+     * @type {number}
+     */
+    addtime;
+
+    /**
+     * 描述/简介
+     * @type {string}
+     */
+    description;
+
+    /**
+     * 总浏览数
+     * @type {string}
+     */
+    total_views;
+
+    /**
+     * 点赞数
+     * @type {string}
+     */
+    likes;
+
+    /**
+     * 章节列表
+     * @type {{ id: string, name: string, sort: string }[]}
+     */
+    series;
+
+    /**
+     * 当前章节ID
+     * @type {string}
+     */
+    series_id;
+
+    /**
+     * 评论总数
+     * @type {string}
+     */
+    comment_total;
+
+    /**
+     * 作者
+     * @type {string[]}
+     */
+    author;
+
+    /**
+     * 标签
+     * @type {string[]}
+     */
+    tags;
+
+    /**
+     * 作者其他作品
+     * @type {string[]}
+     */
+    works;
+
+    /**
+     * 登场角色
+     * @type {string[]}
+     */
+    actors;
+
+    /**
+     * 相关推荐
+     * @type {{ id: string, author: string, name: string, image: string }[]}
+     */
+    related_list;
+
+    /**
+     * 当前用户是否点赞
+     * @type {boolean}
+     */
+    liked;
+
+    /**
+     * 是否收藏
+     * @type {boolean}
+     */
+    is_favorite;
+
+    /**
+     * 是否为成人内容
+     * @type {boolean}
+     */
+    is_aids;
+
+    /**
+     * 价格（积分）
+     * @type {number}
+     */
+    price;
+
+    /**
+     * 购买记录（空串表示未购买）
+     * @type {string}
+     */
+    purchased;
+
+    constructor(data) {
+        this.id = data.id
+        this.name = data.name
+        this.images = data.images
+        this.addtime = data.addtime
+        this.description = data.description
+        this.total_views = data.total_views
+        this.likes = data.likes
+        this.series = data.series
+        this.series_id = data.series_id
+        this.comment_total = data.comment_total
+        this.author = data.author
+        this.tags = data.tags
+        this.works = data.works
+        this.actors = data.actors
+        this.related_list = data.related_list
+        this.liked = data.liked
+        this.is_favorite = data.is_favorite
+        this.is_aids = data.is_aids
+        this.price = data.price
+        this.purchased = data.purchased
+    }
+}
+
 module.exports = {
     PHASE,
     STEP,
     STATE,
-    ERR
+    ERR,
+    JmMeta
 };

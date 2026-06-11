@@ -542,7 +542,7 @@ function createCrawler(manifest, ctx, message, config) {
      * 获取漫画元数据
      * @param number
      * @param phase
-     * @return {Promise<void>}
+     * @return {Promise<*|{number: Number, meta: JmMeta}>}
      */
     async function getMeta(number, phase = PHASE.GET_META) {
         return await message.doPhase(phase || PHASE.GET_META, async (stepHandler) => {
