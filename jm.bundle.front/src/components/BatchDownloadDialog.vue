@@ -86,7 +86,7 @@ async function startDownload() {
   progressTotal.value = ids.length
   for (const id of ids) {
     try {
-      await postJson(`/comics/${id}/batch-add`, { withMeta: true })
+      await postJson(`/comics/${id}/batch-add`, { withMeta: false })
     } catch { /* ignore */ }
     progressDone.value++
   }
