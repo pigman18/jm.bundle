@@ -1187,15 +1187,34 @@ function createCrawler(manifest, ctx, message, config) {
         }
     };
     let rank = {
-        // 每周必看
-        weekly: async () => {
+        /**
+         * 获取每周必看期数
+         * @returns {Promise<{JmWeekInfo}>}
+         */
+        weekInfo: async() => {
             return expireRetry(async () => {
-                let albums = [];
-                await pageWeeklyAlbums(async (pageInfo) => {
-                    albums.push(...(pageInfo.list || []));
-                });
-                return albums;
+                return await reqApi(ApiPath.GetWeeklyInfo);
             });
+        },
+        /**
+         * 获取每周必看
+         * @param categoryId
+         * @param typeId
+         * @returns {Promise<{total: *, list: JmSearchMeta[]}>}
+         */
+        weekly: async (categoryId, typeId) => {
+            let resp = await reqApi(`${ApiPath.GetWeekly}?${toQueryString({
+                "id": categoryId,
+                "type": typeId
+            })}`);
+            let {
+                total,
+                list
+            } = resp;
+            return {
+                total,
+                list
+            }
         },
         // 每周最新连载
         serials: async () => {

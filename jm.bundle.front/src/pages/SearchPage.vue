@@ -58,8 +58,8 @@ onActivated(() => {
 })
 
 const sortOptions = [
-  { label: '最新', value: 'mr' },
-  { label: '最多点击', value: 'mv' },
+  { label: '最新的', value: 'mr' },
+  { label: '最多点阅的', value: 'mv' },
   { label: '最多图片', value: 'mp' },
   { label: '最多爱心', value: 'tf' },
 ]

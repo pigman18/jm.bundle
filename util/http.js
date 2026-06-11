@@ -193,7 +193,12 @@ async function saveAxiosResponse(response, dataPath, bakDataPath = dataPath + ".
     await new Promise((resolve, reject) => {
         writer.on('finish', () => {
             if (fs.existsSync(bakDataPath)) {
-                fs.renameSync(bakDataPath, dataPath);
+                try {
+                    fs.renameSync(bakDataPath, dataPath);
+                } catch (e) {
+                    fs.rmSync(bakDataPath);
+                    reject(err);
+                }
             }
             if (onProgress) {
                 try {

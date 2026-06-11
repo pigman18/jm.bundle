@@ -97,7 +97,7 @@ async function calcMathCaptcha(imageBuffer, options = {}) {
 }
 
 async function getTextForMathCaptcha(imageBuffer, options = {}) {
-  let text = await _getByTesseract(imageBuffer, options);
+  let text = await getByTesseract(imageBuffer, options);
   // if (!_isValidMathExpr(text)) {
   //   console.log('Tesseract 识别失败或非法，尝试 OCRAD 兜底');
   //   text = await _getByOcrad(imageBuffer, options);
@@ -105,7 +105,7 @@ async function getTextForMathCaptcha(imageBuffer, options = {}) {
   return _normalizeMathText(text);
 }
 
-async function _getByTesseract(imageBuffer, options = {}) {
+async function getByTesseract(imageBuffer, options = {}) {
   try {
     const img = await preprocessCaptchaImage(imageBuffer, options.threshold || 150);
     const pngBuffer = await img.getBuffer('image/png');
@@ -169,4 +169,5 @@ function _normalizeMathText(text) {
 
 module.exports = {
   calcMathCaptcha,
+  getByTesseract
 };
