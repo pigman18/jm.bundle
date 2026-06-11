@@ -342,6 +342,79 @@ let SearchSort = {
     Like: "tf"
 };
 
+/**
+ * 每周精選類別項
+ */
+class JmWeekCategory {
+    /**
+     * 類別ID
+     * @type {string}
+     */
+    id;
+
+    /**
+     * 類別標題
+     * @type {string}
+     */
+    title;
+
+    /**
+     * 類別時間範圍
+     * @type {string}
+     */
+    time;
+
+    constructor(id, title, time) {
+        this.id = id;
+        this.title = title;
+        this.time = time;
+    }
+}
+
+/**
+ * 每周精選類型
+ */
+class JmWeekType {
+    /**
+     * 類型ID
+     * @type {string}
+     */
+    id;
+
+    /**
+     * 類型標題
+     * @type {string}
+     */
+    title;
+
+    constructor(id, title) {
+        this.id = id;
+        this.title = title;
+    }
+}
+
+/**
+ * 每周必看
+ */
+class JmWeekInfo {
+    /**
+     * 期数
+     * @type {JmWeekCategory[]}
+     */
+    categories;
+
+    /**
+     * 类型
+     * @type {JmWeekType[]}
+     */
+    type;
+
+    constructor(categories, type) {
+        this.categories = categories;
+        this.type = type;
+    }
+}
+
 module.exports = {
     PHASE,
     STEP,
@@ -350,5 +423,8 @@ module.exports = {
     ApiPath,
     JmMeta,
     JmSearchMeta,
-    SearchSort
+    SearchSort,
+    JmWeekCategory,
+    JmWeekType,
+    JmWeekInfo
 };
