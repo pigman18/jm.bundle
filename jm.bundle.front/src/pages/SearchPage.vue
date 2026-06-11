@@ -57,6 +57,8 @@ onActivated(() => {
   }
 })
 
+function cardToneClass(index: number) { return `tone-${(index % 4) + 1}` }
+
 const sortOptions = [
   { label: '最新的', value: 'mr' },
   { label: '最多点阅的', value: 'mv' },
@@ -133,6 +135,7 @@ function onCoverErr(e: Event, id: number) {
           v-model:value="keyword"
           clearable
           placeholder="输入关键词搜索"
+          :disabled="loading"
           @keyup.enter="doSearch(1)"
         >
           <template #prefix><n-icon :component="SearchOutline" /></template>
@@ -141,20 +144,34 @@ function onCoverErr(e: Event, id: number) {
           v-model:value="sort"
           :options="sortOptions"
           class="jmz-search-sort"
+          :disabled="loading"
         />
-        <n-button type="primary" :loading="loading" @click="doSearch(1)">搜索</n-button>
+        <n-button type="primary" :loading="loading" :disabled="loading" @click="doSearch(1)">搜索</n-button>
       </div>
     </section>
 
     <div class="jmz-search-main">
       <n-empty v-if="!loading && !list.length && keyword.trim()" description="未找到相关漫画" />
       <n-empty v-else-if="!loading && !list.length" description="输入关键词开始搜索" />
-      <div v-else-if="list.length > 0" class="jmz-card-grid">
+      <div
+        v-else-if="list.length > 0 || loading"
+        class="jmz-card-grid-wrap"
+        :class="{ 'jmz-card-grid-wrap--dim': loading && list.length > 0 }"
+      >
+        <div v-if="loading && list.length > 0" class="jmz-list-reload-mask">
+          <n-spin size="medium" />
+        </div>
+        <div v-if="loading && !list.length" class="jmz-card-grid jmz-skel-grid">
+          <div v-for="i in 10" :key="'sk' + i" :class="['jmz-card', 'jmz-skel-card', cardToneClass(i - 1)]">
+            <div class="jmz-skel-cover" />
+            <div class="jmz-skel-lines" />
+          </div>
+        </div>
+        <div v-if="list.length > 0" class="jmz-card-grid">
         <article
           v-for="(c, i) in list"
           :key="c.id"
-          class="jmz-card"
-          :class="{ 'jmz-card--fetching': fetching[c.id] }"
+          :class="['jmz-card', cardToneClass(i), fetching[c.id] ? 'jmz-card--fetching' : '']"
           role="button"
           tabindex="0"
           @click="goDetail(c)"
@@ -205,11 +222,13 @@ function onCoverErr(e: Event, id: number) {
           </div>
         </article>
       </div>
+      </div>
       <div v-if="pages > 1" class="jmz-search-pager">
         <n-pagination
           v-model:page="currentPage"
           :page-count="pages"
           :show-size-picker="false"
+          :disabled="loading"
           @update:page="doSearch"
         />
       </div>
@@ -222,6 +241,54 @@ function onCoverErr(e: Event, id: number) {
 
 <style scoped>
 .jmz-search-page {
+}
+
+.jmz-card-grid-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 200px;
+  margin-top: 16px;
+}
+.jmz-list-reload-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 16, 20, 0.6);
+  pointer-events: none;
+}
+.jmz-card-grid-wrap--dim {
+  opacity: 0.65;
+  pointer-events: none;
+}
+.jmz-skel-grid {
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.jmz-skel-card {
+  cursor: default;
+  pointer-events: none;
+}
+.jmz-skel-cover {
+  aspect-ratio: 3 / 4;
+  background: linear-gradient(90deg, #2a2a30 0%, #35353d 50%, #2a2a30 100%);
+  background-size: 200% 100%;
+  animation: jmz-shimmer 1.1s ease-in-out infinite;
+  border-radius: 8px 8px 0 0;
+}
+.jmz-skel-lines {
+  height: 72px;
+  margin: 12px 14px 14px;
+  border-radius: 8px;
+  background: #2a2a30;
+}
+@keyframes jmz-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
 .jmz-search-bar {
@@ -248,27 +315,36 @@ function onCoverErr(e: Event, id: number) {
 
 .jmz-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
 }
 
 .jmz-card {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
   border-radius: 8px;
+  background: linear-gradient(180deg, #22222a 0%, #1a1a20 100%);
+  border: 1px solid #2e2e35;
+  border-left: 4px solid #3b82f6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 12px 28px rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  background: #1e1e22;
-  border: 1px solid rgba(46, 46, 53, 0.95);
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-  position: relative;
+  outline: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
-
-.jmz-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+.jmz-card.tone-1 { border-left-color: #3b82f6; }
+.jmz-card.tone-2 { border-left-color: #8b5cf6; }
+.jmz-card.tone-3 { border-left-color: #10b981; }
+.jmz-card.tone-4 { border-left-color: #f59e0b; }
+.jmz-card:hover,
+.jmz-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: #3d3d4a;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15), 0 18px 40px rgba(0, 0, 0, 0.4);
 }
-
 .jmz-card--fetching {
   opacity: 0.6;
   pointer-events: none;
@@ -424,9 +500,5 @@ function onCoverErr(e: Event, id: number) {
   color: #7a7a8a;
 }
 
-@media (min-width: 720px) {
-  .jmz-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-}
+
 </style>
