@@ -15,10 +15,10 @@
             <span class="jmz-app-badge" v-if="store.syncLocalToDb.busy">同步中</span>
             <span class="jmz-app-badge jmz-app-badge--ok" v-if="store.syncLocalToDb.complete > 0">sync {{ store.syncLocalToDb.complete }}/{{ store.syncLocalToDb.total }}</span>
             <template v-if="!isDetail">
-              <n-button size="tiny" quaternary @click="goCatalogAndSync('local2db')" :disabled="store.syncLocalToDb.busy">
+              <n-button size="tiny" quaternary @click="syncApi('local2db')" :disabled="store.syncLocalToDb.busy">
                 <template #icon><n-icon :component="CloudUploadOutline" /></template>local→库
               </n-button>
-              <n-button size="tiny" quaternary @click="goCatalogAndSync('db2local')" :disabled="store.syncDbToLocal.busy">
+              <n-button size="tiny" quaternary @click="syncApi('db2local')" :disabled="store.syncDbToLocal.busy">
                 <template #icon><n-icon :component="CloudDownloadOutline" /></template>库→local
               </n-button>
             </template>

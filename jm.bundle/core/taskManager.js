@@ -187,10 +187,10 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
       try {
         const meta = await crawler.album.getMeta(task.number);
         const fields = {};
-        if (meta && meta.title) {
-          fields.name = `JM${task.number}: ${meta.title}`;
-          fields.labels = [meta.title, ...(meta.tags || [])];
-          if (meta.cover && !task.coverBase64) {
+        if (meta && meta.name) {
+          fields.name = `JM${task.number}: ${meta.name}`;
+          fields.labels = [meta.name, ...(meta.tags || [])];
+          if ((meta.images && meta.images[0]) && !task.coverBase64) {
             try {
               const resp = await crawler.httpClient.get(meta.cover, { responseType: 'arraybuffer', timeout: 5000 });
               if (resp && resp.data) {

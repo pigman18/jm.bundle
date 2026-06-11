@@ -35,7 +35,7 @@ const filters = reactive({
   number: '',
   tags: [] as string[],
   kind: '',
-  sort: 'number',
+  sort: 'id',
   order: 'desc',
   page: 1,
   pageSize: 10,
@@ -76,7 +76,7 @@ function readFiltersFromRoute() {
   const ts = scalarQ(q.tags)
   filters.tags = ts ? ts.split(',').map(x => x.trim()).filter(Boolean) : []
   filters.kind = scalarQ(q.kind)
-  filters.sort = scalarQ(q.sort) || 'number'
+  filters.sort = scalarQ(q.sort) || 'id'
   filters.order = scalarQ(q.order) || 'desc'
   const p = parseInt(scalarQ(q.page), 10)
   filters.page = Number.isFinite(p) && p >= 1 ? p : 1
@@ -91,7 +91,7 @@ function filtersToQuery(): Record<string, string> {
   if (filters.number.trim()) q.number = filters.number.trim()
   if (filters.tags.length) q.tags = filters.tags.join(',')
   if (filters.kind) q.kind = filters.kind
-  if (filters.sort !== 'number') q.sort = filters.sort
+  if (filters.sort !== 'id') q.sort = filters.sort
   if (filters.order !== 'desc') q.order = filters.order
   if (filters.page > 1) q.page = String(filters.page)
   if (filters.pageSize !== 10) q.pageSize = String(filters.pageSize)
@@ -177,7 +177,7 @@ function searchTags(query: string) {
 
 function goDetail(c: Comic) {
   saveCatalogReturnQuery(route.query)
-  router.push({ name: 'detail', params: { num: String(c.number) } })
+  router.push({ name: 'detail', params: { num: String(c.id) } })
 }
 
 function filterByTag(t: string, ev?: Event) {
@@ -226,7 +226,7 @@ async function fetchByNumber() {
   if (!Number.isFinite(n) || n < 1) { message.warning('请输入有效漫画编号'); return }
   fetchBusy.value = true
   try {
-    const j = await postJson(`/comics/${n}/fetch-info`)
+    const j = await postJson(`/comics/${n}/fetch-meta`)
     if (!j.ok) { message.warning(j.message || '拉取失败'); return }
     message.success('已更新')
     fetchNum.value = ''
@@ -294,14 +294,11 @@ const kindOptions = [
   { label: '多集', value: 'series' },
 ]
 const sortOptions = [
-  { label: '编号', value: 'number' },
-  { label: '标题', value: 'title' },
-  { label: '作者', value: 'author' },
-  { label: '发布', value: 'publishDate' },
-  { label: '更新', value: 'updateDate' },
-  { label: '观看', value: 'watchQty' },
-  { label: '点赞', value: 'likeQty' },
-  { label: '页数', value: 'pages' },
+  { label: '编号', value: 'id' },
+  { label: '标题', value: 'name' },
+  { label: '浏览', value: 'total_views' },
+  { label: '点赞', value: 'likes' },
+  { label: '时间', value: 'addtime' },
 ]
 const orderOptions = [
   { label: '降序', value: 'desc' },
@@ -366,7 +363,7 @@ const orderOptions = [
         <div v-else class="jmz-card-grid">
           <article
             v-for="(c, i) in list"
-            :key="c.number"
+            :key="c.id"
             :class="['jmz-card', cardToneClass(i)]"
             role="button"
             tabindex="0"
@@ -374,36 +371,36 @@ const orderOptions = [
             @keyup.enter="goDetail(c)"
           >
             <div class="jmz-card-cover-wrap">
-              <div v-show="!coverReady(c.number, c.cover)" class="jmz-cover-spinner" aria-hidden="true">
+              <div v-show="!coverReady(c.id, c.cover)" class="jmz-cover-spinner" aria-hidden="true">
                 <n-spin size="small" />
               </div>
               <img
-                :ref="(el: any) => onCoverImg(el, c.number, c.cover)"
+                :ref="(el: any) => onCoverImg(el, c.id, c.cover)"
                 class="jmz-card-cover"
-                :class="{ 'jmz-card-cover--show': coverReady(c.number, c.cover) }"
+                :class="{ 'jmz-card-cover--show': coverReady(c.id, c.cover) }"
                 :src="c.cover || ''"
-                :alt="c.title"
+                :alt="c.name"
                 :loading="imgLazy(i)"
                 :fetchpriority="coverFetchPriority(i)"
                 decoding="async"
                 width="240"
                 height="320"
-                @load="onCoverLoad(c.number)"
-                @error="onCoverErr($event, c.number)"
+                @load="onCoverLoad(c.id)"
+                @error="onCoverErr($event, c.id)"
               />
               <span v-if="c.canRead" class="jmz-card-ribbon">可读</span>
             </div>
             <div class="jmz-card-body">
-              <div class="jmz-card-num">#{{ c.number }}</div>
-              <h2 class="jmz-card-title">{{ c.title }}</h2>
+              <div class="jmz-card-num">#{{ c.id }}</div>
+              <h2 class="jmz-card-title">{{ c.name }}</h2>
               <div
-                v-if="c.author"
+                v-if="c.author && c.author[0]"
                 class="jmz-card-author jmz-author-link"
                 role="link"
                 tabindex="0"
-                @click.stop="filterByAuthor(c.author, $event)"
-                @keyup.enter.stop="filterByAuthor(c.author, $event)"
-              >{{ c.author }}</div>
+                @click.stop="filterByAuthor(c.author[0], $event)"
+                @keyup.enter.stop="filterByAuthor(c.author[0], $event)"
+              >{{ c.author[0] }}</div>
               <div v-else class="jmz-card-author jmz-card-author--muted">作者未知</div>
               <div class="jmz-card-tags" aria-label="标签">
                 <span
@@ -419,13 +416,12 @@ const orderOptions = [
                 <span v-if="!tagsLine(c).length && !tagsMore(c)" class="jmz-chip jmz-chip--ghost">无标签</span>
               </div>
               <div class="jmz-card-dates">
-                <span v-if="c.publishDate" class="jmz-date"><b>发布</b> {{ c.publishDate }}</span>
-                <span v-if="c.updateDate" class="jmz-date"><b>更新</b> {{ c.updateDate }}</span>
-                <span v-if="!c.publishDate && !c.updateDate" class="jmz-date jmz-date--muted">日期未收录</span>
+                <span v-if="c.addtime" class="jmz-date"><b>添加</b> {{ c.addtime }}</span>
+                <span v-if="!c.addtime" class="jmz-date jmz-date--muted">日期未收录</span>
               </div>
               <div class="jmz-card-foot">
                 <span class="jmz-card-kind">{{ c.displayKindLabel }}</span>
-                <span v-if="c.pages" class="jmz-card-pages">{{ c.pages }}P</span>
+                <span v-if="c.total_views" class="jmz-card-pages">{{ c.total_views }}次</span>
               </div>
             </div>
           </article>

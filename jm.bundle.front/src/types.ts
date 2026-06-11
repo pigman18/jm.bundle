@@ -1,21 +1,24 @@
 export interface Comic {
-  number: number
-  title: string
-  author?: string
+  id: number
+  name: string
+  author?: string[]
   cover?: string
+  images?: string[]
   tags?: string[]
   kind?: string
   displayKindLabel?: string
-  pages?: number
-  publishDate?: string
-  updateDate?: string
-  watchQty?: number
-  likeQty?: number
-  intro?: string
-  keywords?: string
-  publisher?: string
+  total_views?: string
+  likes?: string
+  addtime?: string
+  description?: string
   canRead?: boolean
-  episodes?: ComicEpisode[]
+  series?: ComicSeries[]
+}
+
+export interface ComicSeries {
+  id: string
+  name: string
+  sort: string
 }
 
 export interface ComicEpisode {

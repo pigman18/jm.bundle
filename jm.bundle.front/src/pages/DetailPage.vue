@@ -76,8 +76,8 @@ interface ZipRow {
 const zipStatusMerged = computed(() => {
   if (!comic.value) return {}
   const c = comic.value
-  const eps = Array.isArray(c.episodes) && c.episodes.length ? c.episodes : null
-  const nums = eps ? eps.map(e => Number(e.number)).filter(n => Number.isFinite(n)) : [Number(c.number)].filter(n => Number.isFinite(n))
+  const eps = Array.isArray(c.series) && c.series.length ? c.series : null
+  const nums = eps ? eps.map(e => Number(e.id)).filter(n => Number.isFinite(n)) : [Number(c.id)].filter(n => Number.isFinite(n))
   const base = zipStatus.value || {}
   const ws = live.zipByKey
   const z: Record<string, ZipStatus> = {}
@@ -97,15 +97,15 @@ const zipRows = computed<ZipRow[]>(() => {
   if (!comic.value) return []
   const c = comic.value
   const z = zipStatusMerged.value
-  const eps = Array.isArray(c.episodes) && c.episodes.length ? c.episodes : null
-  const nums = eps ? eps.map(e => Number(e.number)).filter(n => Number.isFinite(n)) : [Number(c.number)].filter(n => Number.isFinite(n))
+  const eps = Array.isArray(c.series) && c.series.length ? c.series : null
+  const nums = eps ? eps.map(e => Number(e.id)).filter(n => Number.isFinite(n)) : [Number(c.id)].filter(n => Number.isFinite(n))
   return nums.map(num => {
     const sk = String(num)
     const st = z[sk] || {}
-    const ep = eps?.find(e => Number(e.number) === num)
-    const siteTitle = (ep ? String(ep.title ?? '') : String(c.title ?? '')).trim()
+    const ep = eps?.find(e => Number(e.id) === num)
+    const siteName = (ep ? String(ep.name ?? '') : String(c.name ?? '')).trim()
     const zipLabel = `#${num}`
-    return { zipKey: sk, num, zipLabel, epTitle: siteTitle, label: [zipLabel, siteTitle].filter(Boolean).join(' '), st }
+    return { zipKey: sk, num, zipLabel, epTitle: siteName, label: [zipLabel, siteName].filter(Boolean).join(' '), st }
   })
 })
 
@@ -178,7 +178,7 @@ async function postDownload(zipKey: string, label: string, silent = false) {
       episodeNumber: Number(zipKey),
       downloadLabel: String(label || '').slice(0, 240),
       coverUrl: comic.value?.cover || '',
-      title: comic.value?.title || '',
+      title: comic.value?.name || '',
       episodeTitle: zipRows.value.find(r => r.zipKey === zipKey)?.epTitle || '',
       withMeta: withMeta.value,
     })
@@ -204,7 +204,7 @@ async function downloadAllMissing() {
 
 async function onRead(row: ZipRow) {
   const n = albumNum.value
-  await openComic(n, row.zipKey, `${comic.value?.title || ''} · ${row.zipLabel}`)
+  await openComic(n, row.zipKey, `${comic.value?.name || ''} · ${row.zipLabel}`)
 }
 
 function backToCatalog() { router.push({ name: 'catalog', query: peekCatalogReturnQuery() }) }
@@ -229,13 +229,10 @@ const asideRows = computed(() => {
     const s = val == null ? '' : String(val).trim()
     if (s) rows.push({ label, val: s })
   }
-  push('关键词', c.keywords)
-  push('页数', c.pages != null ? `${c.pages} P` : '')
-  push('出版', c.publisher)
-  push('发布', c.publishDate)
-  push('更新', c.updateDate)
-  push('观看', c.watchQty)
-  push('点赞', c.likeQty)
+  push('浏览', c.total_views)
+  push('点赞', c.likes)
+  push('时间', c.addtime)
+  push('作者', c.author?.join(', '))
   return rows
 })
 
@@ -249,19 +246,19 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
         <div class="jmz-detail">
           <section :class="['jmz-detail-hero', 'jmz-panel', 'jmz-panel--pad', detailHeroClass]">
             <div class="jmz-detail-cover-wrap">
-              <img class="jmz-detail-cover" :src="comic.cover || ''" :alt="comic.title" />
+              <img class="jmz-detail-cover" :src="comic.cover || ''" :alt="comic.name" />
             </div>
             <div class="jmz-detail-meta">
-              <h1 class="jmz-detail-title">{{ comic.title }}</h1>
-              <p class="jmz-detail-line">#{{ comic.number }} · {{ comic.displayKindLabel }}</p>
-              <p v-if="comic.author" class="jmz-detail-line">
+              <h1 class="jmz-detail-title">{{ comic.name }}</h1>
+              <p class="jmz-detail-line">#{{ comic.id }} · {{ comic.displayKindLabel }}</p>
+              <p v-if="comic.author && comic.author[0]" class="jmz-detail-line">
                 <span class="jmz-detail-author-label">作者：</span>
-                <span class="jmz-author-link" role="link" tabindex="0" @click="filterByAuthor(comic.author, $event)" @keyup.enter="filterByAuthor(comic.author, $event)">{{ comic.author }}</span>
+                <span class="jmz-author-link" role="link" tabindex="0" @click="filterByAuthor(comic.author[0], $event)" @keyup.enter="filterByAuthor(comic.author[0], $event)">{{ comic.author[0] }}</span>
               </p>
               <div v-if="comic.tags?.length" class="jmz-detail-tags">
                 <span v-for="t in comic.tags" :key="t" class="jmz-chip jmz-chip--click" role="link" tabindex="0" @click="filterByTag(t, $event)" @keyup.enter="filterByTag(t, $event)">{{ t }}</span>
               </div>
-              <p v-if="comic.intro" class="jmz-intro">{{ comic.intro }}</p>
+              <p v-if="comic.description" class="jmz-intro">{{ comic.description }}</p>
             </div>
             <aside v-if="asideRows.length" class="jmz-detail-aside" aria-label="漫画属性">
               <h3 class="jmz-aside-title">漫画属性</h3>

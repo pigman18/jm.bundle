@@ -13,11 +13,11 @@ const {getMime, cdn2OriginUrl, url2DataPath} = require('../../util/http');
 
 /** 构建时由 webpack 替换为 dist/bundles/jm.bundle/web-embedded.json；缺失或非对象时走磁盘 web/dist */
 const webEmbedded = (() => {
-  try {
-    return require('./web-embedded.json');
-  } catch {
-    return {};
-  }
+    try {
+        return require('./web-embedded.json');
+    } catch {
+        return {};
+    }
 })();
 
 /**
@@ -31,626 +31,643 @@ const webEmbedded = (() => {
  * @param taskManager 任务管理器
  */
 function createServer(manifest, ctx, message, config, store, crawler, taskManager) {
-  const {workspace} = manifest;
-  let _server;
-  /** 本地 file 缓存 URL 前缀 */
-  const FILE_URI = '/file';
-  const fileQueue = new PQueue({concurrency: 10});
-  /** @type {Set<import('ws')>} */
-  const progressClients = new Set();
-  message.dispatchers.serverState = (payload) => {
-    // 旧的下载进度同步已移除 — taskManager 承担全部任务管理
-  };
-
-  /** 浏览器打开首页时的 origin，用于把站点图片 URL 改写为同源代理 */
-  let serverOrigin = '';
-  let staticMounted = false;
-  const port = Number(config.port) || 47310;
-  const host = '0.0.0.0';
-  const hp = "/index.html";
-  const listenHost = host === '0.0.0.0' ? '127.0.0.1' : host;
-  serverOrigin = `http://${listenHost}:${port}`;
-  let homeUrl = `${serverOrigin}${hp.startsWith('/') ? hp : `/${hp}`}`;
-
-  function handleJmConfig(app, api) {
-    app.post(`${api}/jm-config`, (req, res) => {
-      try {
-        const tmpl =
-          manifest?.config?.template && typeof manifest.config.template === 'object'
-            ? manifest.config.template
-            : {};
-        const allowed = new Set(Object.keys(tmpl));
-        const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
-        for (const key of Object.keys(body)) {
-          if (!allowed.has(key)) continue;
-          config.setValue(key, body[key]);
-        }
-        res.json({ok: true});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  /**
-   * 将远端图片 URL 转为同源路径：`{origin}/{host}/path?originUrl=`，由下方中间件拉取
-   * @param {string} originUrl 完整 https URL
-   */
-  function toFileUrl(originUrl) {
-    let url = String(originUrl || '').trim();
-    // 1、先转换统一 URL
-    url = cdn2OriginUrl(url, config.host, config.cdnHosts);
-    // 2、转换为文件路径（不用加/file）
-    let dataPath = url2DataPath(url, "");
-    return `${serverOrigin}${FILE_URI}${dataPath}?originUrl=${encodeURIComponent(originUrl)}`;
-  }
-
-  /** 将漫画 JSON 中的封面、详情 HTML、缩略图列表中的 http(s) 资源改为同源代理 URL */
-  function rewriteComicMediaUrls(c) {
-    if (!c) return c;
-    const o = {...c};
-    if (o.cover) o.cover = toFileUrl(o.cover);
-    if (Array.isArray(o.zoomImages)) o.zoomImages = o.zoomImages.map((x) => toFileUrl(x));
-    return o;
-  }
-
-  /** 向所有已连接前端推送一条 JSON（与爬虫 dispatch 的 payload 一致，由前端自行解析） */
-  function sendMessage(payload) {
-    const s = typeof payload === 'string' ? payload : JSON.stringify(payload);
-    for (const ws of progressClients) {
-      try {
-        ws.send(s);
-      } catch {
-        /* */
-      }
-    }
-  }
-
-  /** taskManager 已接管所有任务管理 — 移除旧 STEP_CN / formatDownloadTaskProgress / mapProgressToZipDownload */
-
-  /** 为详情接口组装各分册 ZIP 的存在性与下载进度 */
-  async function buildZipStatusMap(comicJson) {
-    const z = {};
-    const eps = Array.isArray(comicJson.episodes) && comicJson.episodes.length ? comicJson.episodes : null;
-    const nums = eps
-      ? eps.map((e) => Number(e.number)).filter((n) => Number.isFinite(n))
-      : [Number(comicJson.number)].filter((n) => Number.isFinite(n));
-    const comicDir = path.join(config.dataDir, 'comic');
-    for (const n of nums) {
-      const sk = String(n);
-      const zipPath = path.join(comicDir, `${n}.zip`);
-      const dl = taskManager ? taskManager.getZipDownloadStatus(n) : null;
-      z[sk] = {
-        exists: isNotEmptySync(zipPath),
-        download: dl,
-      };
-    }
-    return z;
-  }
-
-  function handleProgressWs(app, api) {
-    app.ws(`${api}/ws`, (ws) => {
-      progressClients.add(ws);
-
-      // 连接时下发任务列表与状态定义
-      if (taskManager) {
-        ws.send(JSON.stringify({
-          type: 'init',
-          tasks: taskManager.getTasks(),
-          statuses: taskManager.getStatuses(),
-        }));
-      }
-
-      ws.on('message', (raw) => {
-        if (!taskManager) return;
-        try {
-          const msg = JSON.parse(raw.toString());
-          if (msg.type === 'ping') return;
-          taskManager.handleWSMessage(msg);
-        } catch (_) { /* 忽略无法解析的消息 */ }
-      });
-
-      ws.on('close', () => progressClients.delete(ws));
-    });
-  }
-
-  function handleStatic(app) {
-    const emb = webEmbedded && typeof webEmbedded === 'object' && Object.keys(webEmbedded).length > 0;
-    if (emb) {
-      app.use((req, res, next) => {
-        // ✅ API 直接跳过
-        if (req.path.startsWith('/api/')) {
-          return next();
-        }
-
-        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-
-        let p = decodeURIComponent(req.path.replace(/^\/+/, '')) || 'index.html';
-        if (p.endsWith('/')) p += 'index.html';
-
-        let b64 = webEmbedded[p];
-        if (!b64 && !path.extname(p)) b64 = webEmbedded['index.html'];
-        if (!b64) return next();
-
-        res.setHeader('Content-Type', getMime(p));
-        res.send(Buffer.from(b64, 'base64')).end();
-      });
-      return;
-    }
-
-    // ✅ 兜底：使用磁盘 web/dist
-    app.use(express.static(path.join(workspace, 'web', 'dist')));
-    app.get(hp, (_req, res) => {
-      res.status(503).type('text/plain; charset=utf-8').send(
-          'JM 前端未安装：请用 npm run build:bundles 重新发布，或从镜像重新下载。'
-      ).end();
-    });
-  }
-
-  /**
-   * /file 下挂本地 dataDir/file；缺失时按 query.originUrl 从站点拉取并落盘
-   */
-  function handleStaticFile(app) {
-    app.use(FILE_URI, express.static(path.resolve(`${config.dataDir}/file`), {
-      maxAge: '30d',
-      etag: false,
-      lastModified: false,
-      fallthrough: true, // 必须
-    }));
-    app.use(FILE_URI, (req, res) => {
-      let originUrl = req.query.originUrl;
-      if (!originUrl) {
-        const rel = req.path.replace(/^\/+/, '');
-        originUrl = `https://${rel}`;
-      }
-      if (!originUrl.startsWith('http')) {
-        originUrl = `https:${originUrl}`;
-      }
-      void fileQueue.add(async () => {
-        try {
-          const abs = await crawler.fetchRemoteFile(originUrl);
-          if (!abs || !fs.existsSync(abs) || !isNotEmptySync(abs)) {
-            res.status(404).end();
-            return;
-          }
-          res.setHeader('Content-Type', getMime(abs) || 'application/octet-stream');
-          res.setHeader('Cache-Control', 'public, max-age=86400');
-          fs.createReadStream(abs).pipe(res);
-        } catch (err) {
-          console.error(err);
-          if (!res.headersSent) res.status(500).end();
-        }
-      });
-    });
-  }
-
-
-  function handleSettings(app, api) {
-    app.get(`${api}/settings`, (_req, res) => {
-      const bundleConfig = typeof config.get === 'function' ? config.get() : {...config};
-      res.json({
-        ok: true,
-        bundleConfig
-      });
-    });
-    app.put(`${api}/settings`, (req, res) => {
-      try {
-        const body = req.body || {};
-        const bc = body.bundleConfig;
-        if (bc && typeof bc === 'object') {
-          for (const [k, v] of Object.entries(bc)) {
-            config.setValue(k, v);
-          }
-          config.trigger(manifest);
-        }
-        res.json({ok: true});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  function handleSync(app, api) {
-    app.post(`${api}/sync/local2db`, async (_req, res) => {
-      try {
-        store.runLocal2Db();
-        res.json({ok: true});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-    app.post(`${api}/sync/db2local`, async (_req, res) => {
-      try {
-        store.runDb2Local();
-        res.json({ok: true});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  /** 标签搜索结果缓存（key=查询词，value={tags, expireAt}） */
-  const tagsCache = new Map();
-  const TAGS_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
-  const TAGS_CACHE_MAX = 100; // 最多缓存 100 个查询
-
-  function handleTags(app, api) {
-    app.get(`${api}/tags`, async (req, res) => {
-      try {
-        const query = String(req.query.query || '').trim();
-        
-        // 为空时，返回空数组
-        if (!query) {
-          res.json({ok: true, tags: []}).end();
-          return;
-        }
-
-        // 检查缓存
-        const now = Date.now();
-        const cached = tagsCache.get(query);
-        if (cached && cached.expireAt > now) {
-          res.json({ok: true, tags: cached.tags, fromCache: true}).end();
-          return;
-        }
-
-        // 查询标签
-        let tags = await store.listAllTags(query);
-        
-        // 去重、过滤空值、排序
-        tags = [...new Set(tags)]
-          .filter((tag) => tag && tag.trim())
-          .sort((a, b) => a.localeCompare(b))
-          .slice(0, 50); // 最多返回 50 个标签
-
-        // 更新缓存
-        tagsCache.set(query, { tags, expireAt: now + TAGS_CACHE_TTL });
-        
-        // 清理过期缓存
-        if (tagsCache.size > TAGS_CACHE_MAX) {
-          for (const [key, value] of tagsCache.entries()) {
-            if (value.expireAt <= now) {
-              tagsCache.delete(key);
-            }
-          }
-        }
-
-        res.json({ok: true, tags, fromCache: false}).end();
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  function handleComicsList(app, api) {
-    const sortMap = {
-      number: 'number',
-      title: 'title',
-      author: 'author',
-      publishDate: 'publishDate',
-      updateDate: 'updateDate',
-      watchQty: 'watchQty',
-      likeQty: 'likeQty',
-      pages: 'pages',
+    const {workspace} = manifest;
+    let _server;
+    /** 本地 file 缓存 URL 前缀 */
+    const FILE_URI = '/file';
+    const fileQueue = new PQueue({concurrency: 10});
+    /** @type {Set<import('ws')>} */
+    const progressClients = new Set();
+    message.dispatchers.serverState = (payload) => {
+        // 旧的下载进度同步已移除 — taskManager 承担全部任务管理
     };
-    app.get(`${api}/comics`, async (req, res) => {
-      try {
-        const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
-        const pageSize = Math.min(50, Math.max(1, parseInt(String(req.query.pageSize || '10'), 10) || 10));
-        const title = String(req.query.title || '').trim();
-        const author = String(req.query.author || '').trim();
-        const number = String(req.query.number || '').trim();
-        const tagsRaw = String(req.query.tags || '').trim();
-        const kind = String(req.query.kind || '').trim();
-        const sort = sortMap[String(req.query.sort || 'number')] || 'number';
-        const orderRaw = String(req.query.order || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-        const parts = ['1=1'];
-        const params = {};
-        if (title) {
-          parts.push('title LIKE @t');
-          params.t = `%${title}%`;
-        }
-        if (author) {
-          parts.push('author = @a');
-          params.a = author;
-        }
-        if (number) {
-          parts.push('CAST(number AS TEXT) LIKE @n');
-          params.n = `%${number}%`;
-        }
-        if (tagsRaw) {
-          tagsRaw.split(',').forEach((tag, i) => {
-            const key = `tg${i}`;
-            parts.push(`tags LIKE @${key}`);
-            params[key] = `%${String(tag).trim()}%`;
-          });
-        }
-        if (kind === 'single') {
-          parts.push("(episodes IS NULL OR episodes = '' OR episodes = '[]' OR json_array_length(episodes) < 2)");
-        }
-        if (kind === 'series') {
-          parts.push("json_array_length(COALESCE(episodes, '[]')) > 1");
-        }
-        const where = `WHERE ${parts.join(' AND ')}`;
-        const {total, rows} = await store.pageComic(params, page, pageSize, where, sort, orderRaw);
-        const comicDir = path.join(config.dataDir, 'comic');
-        const list = rows.map((row) => {
-          const j = rewriteComicMediaUrls(store.dbRowToJson(row));
-          j.canRead = isNotEmptySync(path.join(comicDir, `${j.number}.zip`));
-          return j;
-        });
-        res.json({ok: true, list, total});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
 
-  function handleFetchInfo(app, api) {
-    app.post(`${api}/comics/:num/fetch-info`, async (req, res) => {
-      try {
-        const n = Math.floor(Number(req.params.num));
-        const info = await crawler.album.getMeta(n);
-        if (!info) {
-          res.json({ok: false, message: '无可用信息或编号无效'});
-          return;
-        }
-        await store.saveOrUpdate(store.jsonRowToDb(info));
-        const row = await store.getComic(n);
-        const comic = row ? rewriteComicMediaUrls(store.dbRowToJson(row)) : null;
-        if (!comic) {
-          res.json({ok: false, message: '获取信息失败'});
-          return;
-        }
-        const eps = Array.isArray(comic.episodes) && comic.episodes.length ? comic.episodes : [];
-        const comicDir = path.join(config.dataDir, 'comic');
-        const allEpisodes = eps.map(e => {
-          const en = Number(e.number);
-          return { number: en, title: String(e.title || ''), done: isNotEmptySync(path.join(comicDir, `${en}.zip`)) };
-        });
-        const singleDone = allEpisodes.length === 0 && isNotEmptySync(path.join(comicDir, `${n}.zip`));
-        const allDone = (allEpisodes.length > 0 && allEpisodes.every(e => e.done)) || singleDone;
-        res.json({
-          ok: true,
-          number: comic.number,
-          title: comic.title,
-          cover: comic.cover || '',
-          episodes: allEpisodes,
-          allDone,
-        });
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
+    /** 浏览器打开首页时的 origin，用于把站点图片 URL 改写为同源代理 */
+    let serverOrigin = '';
+    let staticMounted = false;
+    const port = Number(config.port) || 47310;
+    const host = '0.0.0.0';
+    const hp = "/index.html";
+    const listenHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+    serverOrigin = `http://${listenHost}:${port}`;
+    let homeUrl = `${serverOrigin}${hp.startsWith('/') ? hp : `/${hp}`}`;
 
-  function handleComicDetail(app, api) {
-    app.get(`${api}/comics/:num`, async (req, res) => {
-      try {
-        const n = Math.floor(Number(req.params.num));
-        const row = await store.getComic(n);
-        if (!row) {
-          res.json({ok: false, message: '未找到漫画'});
-          return;
-        }
-        const comic = rewriteComicMediaUrls(store.dbRowToJson(row));
-        const zipStatus = await buildZipStatusMap(comic);
-        res.json({ok: true, comic, zipStatus});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  function handleDownload(app, api) {
-    app.post(`${api}/comics/:num/download`, async (req, res) => {
-      try {
-        const album = Math.floor(Number(req.params.num));
-        const episodeNumber = Math.floor(Number(req.body.episodeNumber));
-        const n = Number.isFinite(episodeNumber) && episodeNumber > 0 ? episodeNumber : album;
-        const coverUrl = String(req.body.coverUrl || '');
-        const title = String(req.body.title || '');
-        const episodeTitle = String(req.body.episodeTitle || '');
-        const downloadLabel = String(req.body.downloadLabel || '').slice(0, 240);
-        const withMeta = req.body.withMeta !== false;
-
-        // 构建展示标题
-        let displayTitle;
-        if (n !== album && episodeTitle) {
-          displayTitle = `JM${n}: ${title || `#${album}`} - ${episodeTitle}`;
-        } else {
-          displayTitle = `JM${album}: ${title || `#${album}`}`;
-        }
-
-        // 封面转 base64
-        let coverBase64 = '';
-        if (coverUrl) {
-          try {
-            const resp = await fetch(coverUrl, { signal: AbortSignal.timeout(5000) });
-            if (resp.ok) {
-              const buf = Buffer.from(await resp.arrayBuffer());
-              const mime = resp.headers.get('content-type') || 'image/jpeg';
-              coverBase64 = `data:${mime};base64,${buf.toString('base64')}`;
-            }
-          } catch (_) {}
-        }
-
-        if (taskManager) {
-          // afterSteps：下载完成后用完整元信息注入 ComicInfo.xml
-          const afterSteps = async ({ file }) => {
-            if (!withMeta) return;
+    function handleJmConfig(app, api) {
+        app.post(`${api}/jm-config`, (req, res) => {
             try {
-              const albumInfo = await crawler.album.getMeta(album);
-              if (albumInfo) {
-                await crawler.album.appendComicInfo2Archive(albumInfo, file);
-              }
-            } catch (_) {}
-          };
-          const result = await taskManager.addTask(n, [album.toString(), downloadLabel].filter(Boolean), {
-            coverBase64,
-            displayTitle,
-            episodeNumber: n,
-            withMeta,
-            afterSteps,
-          });
-          if (!result.ok) { res.json(result); return; }
-        }
-        res.json({ok: true});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  function handleBatchAdd(app, api) {
-    app.post(`${api}/comics/:num/batch-add`, async (req, res) => {
-      try {
-        const num = Math.floor(Number(req.params.num));
-        if (!Number.isFinite(num)) { res.json({ok: false, message: '无效编号'}); return; }
-        const withMeta = req.body.withMeta !== false;
-
-        if (!taskManager) { res.json({ok: false, message: '任务管理器不可用'}); return; }
-
-        const afterSteps = async ({ file }) => {
-          if (!withMeta) return;
-          try {
-            const albumInfo = await crawler.album.getMeta(num);
-            if (albumInfo) await crawler.album.appendComicInfo2Archive(albumInfo, file);
-          } catch (_) {}
-        };
-
-        const result = await taskManager.addTask(num, [], {
-          episodeNumber: num,
-          withMeta,
-          afterSteps,
-        });
-        res.json(result);
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  function handleZipFile(app, api) {
-    app.get(`${api}/comics/:albumNum/zip-file/:zipKey`, (req, res) => {
-      const n = Math.floor(Number(req.params.zipKey));
-      const zipPath = path.join(config.dataDir, 'comic', `${n}.zip`);
-      if (!isNotEmptySync(zipPath)) {
-        res.status(404).json({ok: false, message: 'ZIP 不存在'});
-        return;
-      }
-      res.setHeader('Content-Type', 'application/zip');
-      fs.createReadStream(zipPath).pipe(res);
-    });
-  }
-
-  function handleOpenViewer(app, api) {
-    app.post(`${api}/comics/:num/open-viewer`, async (req, res) => {
-      try {
-        const album = Math.floor(Number(req.params.num));
-        const episodeNumber = Math.floor(Number(req.body.episodeNumber));
-        const n = Number.isFinite(episodeNumber) && episodeNumber > 0 ? episodeNumber : album;
-        const zipPath = path.join(path.resolve(manifest.workspace, config.dataDir), 'comic', `${n}.zip`);
-        const exeRel = String(config.comicViewer || '').trim();
-        if (!exeRel) {
-          res.json({ok: true, useBrowser: true});
-          return;
-        }
-        if (!isNotEmptySync(zipPath)) {
-          res.json({ok: false, message: 'ZIP 不存在'});
-          return;
-        }
-        const workspaceRoot = String(manifest.workspace || path.join(__dirname, '..'));
-        const exeAbs = path.isAbsolute(exeRel) ? exeRel : path.join(workspaceRoot, exeRel);
-        const cmdTpl = "${exe} ${path}";
-        if (cmdTpl) {
-          const q = (p) => {
-            const s = String(p);
-            if (process.platform === 'win32') {
-              if (!/[ \t"&[\]{}|^`%]/.test(s)) return s;
-              return `"${s.replace(/"/g, '""')}"`;
+                const tmpl =
+                    manifest?.config?.template && typeof manifest.config.template === 'object'
+                        ? manifest.config.template
+                        : {};
+                const allowed = new Set(Object.keys(tmpl));
+                const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+                for (const key of Object.keys(body)) {
+                    if (!allowed.has(key)) continue;
+                    config.setValue(key, body[key]);
+                }
+                res.json({ok: true});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
             }
-            return `'${s.replace(/'/g, `'\\''`)}'`;
-          };
-          const cmdLine = cmdTpl.replace(/\$\{path\}/gi, q(zipPath)).replace(/\$\{exe\}/gi, q(exeAbs));
-          const child = exec(cmdLine, {windowsHide: true, detached: true}, () => {
-          });
-          if (child && typeof child.unref === 'function') child.unref();
-          res.json({ok: true, useBrowser: false});
-          return;
-        }
-        const args = [];
-        spawn(exeAbs, args, {detached: true, stdio: 'ignore'}).unref();
-        res.json({ok: true, useBrowser: false});
-      } catch (e) {
-        res.status(500).json({ok: false, message: String(e.message || e)});
-      }
-    });
-  }
-
-  async function start() {
-    const app = express();
-    expressWs(app);
-    const morgan = require('morgan');
-    morgan.token('time', () => new Date().toISOString())
-    morgan.token('body', (req) => JSON.stringify(req.body))
-    morgan.token('pid', () => process.pid)
-    app.use(
-      morgan(
-        ':time [:pid] :method :url :status :res[content-length] - :response-time ms'
-      )
-    );
-    app.use(compression());
-    app.use(express.json({limit: '2mb'}));
-    const api = '/api';
-    app.get('/', (_, res) => {
-      res.send('<html><body>ok</body></html>');
-    });
-    handleStatic(app);
-    handleStaticFile(app);
-    handleProgressWs(app, api);
-    handleJmConfig(app, api);
-    handleSettings(app, api);
-    handleSync(app, api);
-    handleTags(app, api);
-    handleComicsList(app, api);
-    handleFetchInfo(app, api);
-    handleComicDetail(app, api);
-    handleDownload(app, api);
-    handleBatchAdd(app, api);
-    handleZipFile(app, api);
-    handleOpenViewer(app, api);
-    await new Promise((resolve, reject) => {
-      _server = app.listen(port, host, () => {
-        if (typeof ctx?.log === 'function') {
-          ctx.log({
-            text: `[jm.server] ${homeUrl} listen=${host}:${port} static=${staticMounted ? 'ok' : 'missing'}`,
-          });
-        }
-        console.log(`[jm.server] ${homeUrl} listen=${host}:${port} static=${staticMounted ? 'ok' : 'missing'}`);
-        resolve({port, homeUrl, host});
-      });
-      _server.on('error', reject);
-    });
-    return {port, homeUrl: homeUrl, host};
-  }
-
-  async function stop() {
-    if (_server) {
-      _server.close();
-      _server = null;
+        });
     }
-    progressClients.clear();
-  }
 
-  return {
-    start,
-    stop,
-    sendMessage,
-    toFileUrl,
-    homeUrl
-  };
+    /**
+     * 将远端图片 URL 转为同源路径：`{origin}/{host}/path?originUrl=`，由下方中间件拉取
+     * @param {string} originUrl 完整 https URL
+     */
+    function toFileUrl(originUrl) {
+        let url = String(originUrl || '').trim();
+        // 1、先转换统一 URL
+        url = cdn2OriginUrl(url, config.host, config.cdnHosts);
+        // 2、转换为文件路径（不用加/file）
+        let dataPath = url2DataPath(url, "");
+        return `${serverOrigin}${FILE_URI}${dataPath}?originUrl=${encodeURIComponent(originUrl)}`;
+    }
+
+    /** 将漫画 JSON 中的封面、详情 HTML、缩略图列表中的 http(s) 资源改为同源代理 URL */
+    function rewriteComicMediaUrls(c) {
+        if (!c) return c;
+        const o = {...c};
+        // 设置默认封面
+        let cdnHost = config.cdnHosts[Math.floor(Math.random() * config.cdnHosts.length)];
+        o.cover = o.cover || `${cdnHost}/media/albums/${c.id}.jpg`;
+        if (o.cover) o.cover = toFileUrl(o.cover);
+        if (Array.isArray(o.zoomImages)) o.zoomImages = o.zoomImages.map((x) => toFileUrl(x));
+        return o;
+    }
+
+    /** 向所有已连接前端推送一条 JSON（与爬虫 dispatch 的 payload 一致，由前端自行解析） */
+    function sendMessage(payload) {
+        const s = typeof payload === 'string' ? payload : JSON.stringify(payload);
+        for (const ws of progressClients) {
+            try {
+                ws.send(s);
+            } catch {
+                /* */
+            }
+        }
+    }
+
+    /** taskManager 已接管所有任务管理 — 移除旧 STEP_CN / formatDownloadTaskProgress / mapProgressToZipDownload */
+
+    /** 为详情接口组装各分册 ZIP 的存在性与下载进度 */
+    async function buildZipStatusMap(comicJson) {
+        const z = {};
+        const eps = Array.isArray(comicJson.series) && comicJson.series.length ? comicJson.series : null;
+        const nums = eps
+            ? eps.map((e) => Number(e.id)).filter((n) => Number.isFinite(n))
+            : [Number(comicJson.id)].filter((n) => Number.isFinite(n));
+        const comicDir = path.join(config.dataDir, 'comic');
+        for (const n of nums) {
+            const sk = String(n);
+            const zipPath = path.join(comicDir, `${n}.zip`);
+            const dl = taskManager ? taskManager.getZipDownloadStatus(n) : null;
+            z[sk] = {
+                exists: isNotEmptySync(zipPath),
+                download: dl,
+            };
+        }
+        return z;
+    }
+
+    function handleProgressWs(app, api) {
+        app.ws(`${api}/ws`, (ws) => {
+            progressClients.add(ws);
+
+            // 连接时下发任务列表与状态定义
+            if (taskManager) {
+                ws.send(JSON.stringify({
+                    type: 'init',
+                    tasks: taskManager.getTasks(),
+                    statuses: taskManager.getStatuses(),
+                }));
+            }
+
+            ws.on('message', (raw) => {
+                if (!taskManager) return;
+                try {
+                    const msg = JSON.parse(raw.toString());
+                    if (msg.type === 'ping') return;
+                    taskManager.handleWSMessage(msg);
+                } catch (_) { /* 忽略无法解析的消息 */
+                }
+            });
+
+            ws.on('close', () => progressClients.delete(ws));
+        });
+    }
+
+    function handleStatic(app) {
+        const emb = webEmbedded && typeof webEmbedded === 'object' && Object.keys(webEmbedded).length > 0;
+        if (emb) {
+            app.use((req, res, next) => {
+                // ✅ API 直接跳过
+                if (req.path.startsWith('/api/')) {
+                    return next();
+                }
+
+                if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+
+                let p = decodeURIComponent(req.path.replace(/^\/+/, '')) || 'index.html';
+                if (p.endsWith('/')) p += 'index.html';
+
+                let b64 = webEmbedded[p];
+                if (!b64 && !path.extname(p)) b64 = webEmbedded['index.html'];
+                if (!b64) return next();
+
+                res.setHeader('Content-Type', getMime(p));
+                res.send(Buffer.from(b64, 'base64')).end();
+            });
+            return;
+        }
+
+        // ✅ 兜底：使用磁盘 web/dist
+        app.use(express.static(path.join(workspace, 'web', 'dist')));
+        app.get(hp, (_req, res) => {
+            res.status(503).type('text/plain; charset=utf-8').send(
+                'JM 前端未安装：请用 npm run build:bundles 重新发布，或从镜像重新下载。'
+            ).end();
+        });
+    }
+
+    /**
+     * /file 下挂本地 dataDir/file；缺失时按 query.originUrl 从站点拉取并落盘
+     */
+    function handleStaticFile(app) {
+        app.use(FILE_URI, express.static(path.resolve(`${config.dataDir}/file`), {
+            maxAge: '30d',
+            etag: false,
+            lastModified: false,
+            fallthrough: true, // 必须
+        }));
+        app.use(FILE_URI, (req, res) => {
+            let originUrl = req.query.originUrl;
+            if (!originUrl) {
+                const rel = req.path.replace(/^\/+/, '');
+                originUrl = `https://${rel}`;
+            }
+            if (!originUrl.startsWith('http')) {
+                originUrl = `https:${originUrl}`;
+            }
+            void fileQueue.add(async () => {
+                try {
+                    const abs = await crawler.fetchRemoteFile(originUrl);
+                    if (!abs || !fs.existsSync(abs) || !isNotEmptySync(abs)) {
+                        res.status(404).end();
+                        return;
+                    }
+                    res.setHeader('Content-Type', getMime(abs) || 'application/octet-stream');
+                    res.setHeader('Cache-Control', 'public, max-age=86400');
+                    fs.createReadStream(abs).pipe(res);
+                } catch (err) {
+                    console.error(err);
+                    if (!res.headersSent) res.status(500).end();
+                }
+            });
+        });
+    }
+
+
+    function handleSettings(app, api) {
+        app.get(`${api}/settings`, (_req, res) => {
+            const bundleConfig = typeof config.get === 'function' ? config.get() : {...config};
+            res.json({
+                ok: true,
+                bundleConfig
+            });
+        });
+        app.put(`${api}/settings`, (req, res) => {
+            try {
+                const body = req.body || {};
+                const bc = body.bundleConfig;
+                if (bc && typeof bc === 'object') {
+                    for (const [k, v] of Object.entries(bc)) {
+                        config.setValue(k, v);
+                    }
+                    config.trigger(manifest);
+                }
+                res.json({ok: true});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleSync(app, api) {
+        app.post(`${api}/sync/local2db`, async (_req, res) => {
+            try {
+                store.runLocal2Db();
+                res.json({ok: true});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+        app.post(`${api}/sync/db2local`, async (_req, res) => {
+            try {
+                store.runDb2Local();
+                res.json({ok: true});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    /** 标签搜索结果缓存（key=查询词，value={tags, expireAt}） */
+    const tagsCache = new Map();
+    const TAGS_CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+    const TAGS_CACHE_MAX = 100; // 最多缓存 100 个查询
+
+    function handleTags(app, api) {
+        app.get(`${api}/tags`, async (req, res) => {
+            try {
+                const query = String(req.query.query || '').trim();
+
+                // 为空时，返回空数组
+                if (!query) {
+                    res.json({ok: true, tags: []}).end();
+                    return;
+                }
+
+                // 检查缓存
+                const now = Date.now();
+                const cached = tagsCache.get(query);
+                if (cached && cached.expireAt > now) {
+                    res.json({ok: true, tags: cached.tags, fromCache: true}).end();
+                    return;
+                }
+
+                // 查询标签
+                let tags = await store.comicMeta.listTags(query);
+
+                // 去重、过滤空值、排序
+                tags = [...new Set(tags)]
+                    .filter((tag) => tag && tag.trim())
+                    .sort((a, b) => a.localeCompare(b))
+                    .slice(0, 50); // 最多返回 50 个标签
+
+                // 更新缓存
+                tagsCache.set(query, {tags, expireAt: now + TAGS_CACHE_TTL});
+
+                // 清理过期缓存
+                if (tagsCache.size > TAGS_CACHE_MAX) {
+                    for (const [key, value] of tagsCache.entries()) {
+                        if (value.expireAt <= now) {
+                            tagsCache.delete(key);
+                        }
+                    }
+                }
+
+                res.json({ok: true, tags, fromCache: false}).end();
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleComicsList(app, api) {
+        const sortMap = {
+            id: 'id',
+            name: 'name',
+            total_views: 'total_views',
+            likes: 'likes',
+            addtime: 'addtime',
+        };
+        app.get(`${api}/comics`, async (req, res) => {
+            try {
+                const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+                const pageSize = Math.min(50, Math.max(1, parseInt(String(req.query.pageSize || '10'), 10) || 10));
+                const name = String(req.query.title || req.query.name || '').trim();
+                const author = String(req.query.author || '').trim();
+                const id = String(req.query.number || req.query.id || '').trim();
+                const tagsRaw = String(req.query.tags || '').trim();
+                const kind = String(req.query.kind || '').trim();
+                const sort = sortMap[String(req.query.sort || 'id')] || 'id';
+                const orderRaw = String(req.query.order || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+                const parts = ['1=1'];
+                const params = {};
+                if (name) {
+                    parts.push('name LIKE @n');
+                    params.n = `%${name}%`;
+                }
+                if (author) {
+                    parts.push('author LIKE @a');
+                    params.a = `%"${author}"%`;
+                }
+                if (id) {
+                    parts.push('CAST(id AS TEXT) LIKE @i');
+                    params.i = `%${id}%`;
+                }
+                if (tagsRaw) {
+                    tagsRaw.split(',').forEach((tag, i) => {
+                        const key = `tg${i}`;
+                        parts.push(`tags LIKE @${key}`);
+                        params[key] = `%${String(tag).trim()}%`;
+                    });
+                }
+                if (kind === 'single') {
+                    parts.push("(series IS NULL OR series = '' OR series = '[]' OR json_array_length(series) < 2)");
+                }
+                if (kind === 'series') {
+                    parts.push("json_array_length(COALESCE(series, '[]')) > 1");
+                }
+                const where = `WHERE ${parts.join(' AND ')}`;
+                const {total, rows} = await store.comicMeta.page(params, page, pageSize, where, sort, orderRaw);
+                const comicDir = path.join(config.dataDir, 'comic');
+                const list = rows.map((row) => {
+                    const j = rewriteComicMediaUrls(store.dbRowToJson(row));
+                    j.canRead = isNotEmptySync(path.join(comicDir, `${j.id}.zip`));
+                    return j;
+                });
+                res.json({ok: true, list, total});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleFetchMeta(app, api) {
+        app.post(`${api}/comics/:num/fetch-meta`, async (req, res) => {
+            try {
+                const n = Math.floor(Number(req.params.num));
+                const info = await crawler.album.getMeta(n);
+                if (!info) {
+                    res.json({ok: false, message: '无可用信息或编号无效'});
+                    return;
+                }
+                await store.comicMeta.saveOrUpdate(store.jsonRowToDb(info));
+                const row = await store.comicMeta.get(n);
+                const comic = row ? rewriteComicMediaUrls(store.dbRowToJson(row)) : null;
+                if (!comic) {
+                    res.json({ok: false, message: '获取信息失败'});
+                    return;
+                }
+                const eps = Array.isArray(comic.series) && comic.series.length ? comic.series : [];
+                const comicDir = path.join(config.dataDir, 'comic');
+                const allSeries = eps.map(e => {
+                    const en = Number(e.id);
+                    return {
+                        id: String(e.id),
+                        name: String(e.name || ''),
+                        done: isNotEmptySync(path.join(comicDir, `${en}.zip`))
+                    };
+                });
+                const singleDone = allSeries.length === 0 && isNotEmptySync(path.join(comicDir, `${n}.zip`));
+                const allDone = (allSeries.length > 0 && allSeries.every(e => e.done)) || singleDone;
+                res.json({
+                    ok: true,
+                    id: comic.id,
+                    name: comic.name,
+                    cover: comic.cover || '',
+                    series: allSeries,
+                    allDone,
+                });
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleComicDetail(app, api) {
+        app.get(`${api}/comics/:num`, async (req, res) => {
+            try {
+                const n = Math.floor(Number(req.params.num));
+                const row = await store.comicMeta.get(n);
+                if (!row) {
+                    res.json({ok: false, message: '未找到漫画'});
+                    return;
+                }
+                const comic = rewriteComicMediaUrls(store.dbRowToJson(row));
+                const zipStatus = await buildZipStatusMap(comic);
+                res.json({ok: true, comic, zipStatus});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleDownload(app, api) {
+        app.post(`${api}/comics/:num/download`, async (req, res) => {
+            try {
+                const album = Math.floor(Number(req.params.num));
+                const episodeNumber = Math.floor(Number(req.body.episodeNumber));
+                const n = Number.isFinite(episodeNumber) && episodeNumber > 0 ? episodeNumber : album;
+                const coverUrl = String(req.body.coverUrl || '');
+                const name = String(req.body.title || req.body.name || '');
+                const episodeName = String(req.body.episodeTitle || req.body.episodeName || '');
+                const downloadLabel = String(req.body.downloadLabel || '').slice(0, 240);
+                const withMeta = req.body.withMeta !== false;
+
+                // 构建展示标题
+                let displayTitle;
+                if (n !== album && episodeName) {
+                    displayTitle = `JM${n}: ${name || `#${album}`} - ${episodeName}`;
+                } else {
+                    displayTitle = `JM${album}: ${name || `#${album}`}`;
+                }
+
+                // 封面转 base64
+                let coverBase64 = '';
+                if (coverUrl) {
+                    try {
+                        const resp = await fetch(coverUrl, {signal: AbortSignal.timeout(5000)});
+                        if (resp.ok) {
+                            const buf = Buffer.from(await resp.arrayBuffer());
+                            const mime = resp.headers.get('content-type') || 'image/jpeg';
+                            coverBase64 = `data:${mime};base64,${buf.toString('base64')}`;
+                        }
+                    } catch (_) {
+                    }
+                }
+
+                if (taskManager) {
+                    // afterSteps：下载完成后用完整元信息注入 ComicInfo.xml
+                    const afterSteps = async ({file}) => {
+                        if (!withMeta) return;
+                        try {
+                            const albumInfo = await crawler.album.getMeta(album);
+                            if (albumInfo) {
+                                await crawler.album.appendComicInfo2Archive(albumInfo, file);
+                            }
+                        } catch (_) {
+                        }
+                    };
+                    const result = await taskManager.addTask(n, [album.toString(), downloadLabel].filter(Boolean), {
+                        coverBase64,
+                        displayTitle,
+                        episodeNumber: n,
+                        withMeta,
+                        afterSteps,
+                    });
+                    if (!result.ok) {
+                        res.json(result);
+                        return;
+                    }
+                }
+                res.json({ok: true});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleBatchAdd(app, api) {
+        app.post(`${api}/comics/:num/batch-add`, async (req, res) => {
+            try {
+                const num = Math.floor(Number(req.params.num));
+                if (!Number.isFinite(num)) {
+                    res.json({ok: false, message: '无效编号'});
+                    return;
+                }
+                const withMeta = req.body.withMeta !== false;
+
+                if (!taskManager) {
+                    res.json({ok: false, message: '任务管理器不可用'});
+                    return;
+                }
+
+                const afterSteps = async ({file}) => {
+                    if (!withMeta) return;
+                    try {
+                        const albumInfo = await crawler.album.getMeta(num);
+                        if (albumInfo) await crawler.album.appendComicInfo2Archive(albumInfo, file);
+                    } catch (_) {
+                    }
+                };
+
+                const result = await taskManager.addTask(num, [], {
+                    episodeNumber: num,
+                    withMeta,
+                    afterSteps,
+                });
+                res.json(result);
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleZipFile(app, api) {
+        app.get(`${api}/comics/:albumNum/zip-file/:zipKey`, (req, res) => {
+            const n = Math.floor(Number(req.params.zipKey));
+            const zipPath = path.join(config.dataDir, 'comic', `${n}.zip`);
+            if (!isNotEmptySync(zipPath)) {
+                res.status(404).json({ok: false, message: 'ZIP 不存在'});
+                return;
+            }
+            res.setHeader('Content-Type', 'application/zip');
+            fs.createReadStream(zipPath).pipe(res);
+        });
+    }
+
+    function handleOpenViewer(app, api) {
+        app.post(`${api}/comics/:num/open-viewer`, async (req, res) => {
+            try {
+                const album = Math.floor(Number(req.params.num));
+                const episodeNumber = Math.floor(Number(req.body.episodeNumber));
+                const n = Number.isFinite(episodeNumber) && episodeNumber > 0 ? episodeNumber : album;
+                const zipPath = path.join(path.resolve(manifest.workspace, config.dataDir), 'comic', `${n}.zip`);
+                const exeRel = String(config.comicViewer || '').trim();
+                if (!exeRel) {
+                    res.json({ok: true, useBrowser: true});
+                    return;
+                }
+                if (!isNotEmptySync(zipPath)) {
+                    res.json({ok: false, message: 'ZIP 不存在'});
+                    return;
+                }
+                const workspaceRoot = String(manifest.workspace || path.join(__dirname, '..'));
+                const exeAbs = path.isAbsolute(exeRel) ? exeRel : path.join(workspaceRoot, exeRel);
+                const cmdTpl = "${exe} ${path}";
+                if (cmdTpl) {
+                    const q = (p) => {
+                        const s = String(p);
+                        if (process.platform === 'win32') {
+                            if (!/[ \t"&[\]{}|^`%]/.test(s)) return s;
+                            return `"${s.replace(/"/g, '""')}"`;
+                        }
+                        return `'${s.replace(/'/g, `'\\''`)}'`;
+                    };
+                    const cmdLine = cmdTpl.replace(/\$\{path\}/gi, q(zipPath)).replace(/\$\{exe\}/gi, q(exeAbs));
+                    const child = exec(cmdLine, {windowsHide: true, detached: true}, () => {
+                    });
+                    if (child && typeof child.unref === 'function') child.unref();
+                    res.json({ok: true, useBrowser: false});
+                    return;
+                }
+                const args = [];
+                spawn(exeAbs, args, {detached: true, stdio: 'ignore'}).unref();
+                res.json({ok: true, useBrowser: false});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    async function start() {
+        const app = express();
+        expressWs(app);
+        const morgan = require('morgan');
+        morgan.token('time', () => new Date().toISOString())
+        morgan.token('body', (req) => JSON.stringify(req.body))
+        morgan.token('pid', () => process.pid)
+        app.use(
+            morgan(
+                ':time [:pid] :method :url :status :res[content-length] - :response-time ms'
+            )
+        );
+        app.use(compression());
+        app.use(express.json({limit: '2mb'}));
+        const api = '/api';
+        app.get('/', (_, res) => {
+            res.send('<html><body>ok</body></html>');
+        });
+        handleStatic(app);
+        handleStaticFile(app);
+        handleProgressWs(app, api);
+        handleJmConfig(app, api);
+        handleSettings(app, api);
+        handleSync(app, api);
+        handleTags(app, api);
+        handleComicsList(app, api);
+        handleFetchMeta(app, api);
+        handleComicDetail(app, api);
+        handleDownload(app, api);
+        handleBatchAdd(app, api);
+        handleZipFile(app, api);
+        handleOpenViewer(app, api);
+        await new Promise((resolve, reject) => {
+            _server = app.listen(port, host, () => {
+                if (typeof ctx?.log === 'function') {
+                    ctx.log({
+                        text: `[jm.server] ${homeUrl} listen=${host}:${port} static=${staticMounted ? 'ok' : 'missing'}`,
+                    });
+                }
+                console.log(`[jm.server] ${homeUrl} listen=${host}:${port} static=${staticMounted ? 'ok' : 'missing'}`);
+                resolve({port, homeUrl, host});
+            });
+            _server.on('error', reject);
+        });
+        return {port, homeUrl: homeUrl, host};
+    }
+
+    async function stop() {
+        if (_server) {
+            _server.close();
+            _server = null;
+        }
+        progressClients.clear();
+    }
+
+    return {
+        start,
+        stop,
+        sendMessage,
+        toFileUrl,
+        homeUrl
+    };
 }
 
 module.exports = {
-  createServer,
+    createServer,
 };

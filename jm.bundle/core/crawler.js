@@ -1131,13 +1131,11 @@ function createCrawler(manifest, ctx, message, config) {
                 return;
             }
             let {
-                aid,
-                episodes,
-                title,
+                id,
+                series,
+                name: title,
                 description,
-                authors,
-                uploader,
-                allTags,
+                author: authors,
                 tags
             } = info;
             let comicInfo = {
@@ -1158,22 +1156,22 @@ function createCrawler(manifest, ctx, message, config) {
             comicInfo.summary = description;
             comicInfo.writer = (authors || []).join(',');
             comicInfo.penciller = (authors || []).join(',');
-            comicInfo.publisher = uploader;
-            comicInfo.genre = (allTags || []).join(',');
+            comicInfo.publisher = (authors || [])[0] || '';
+            comicInfo.genre = (tags || []).join(',');
             comicInfo.tags = (tags || []).join(',');
-            const albumNumber = info.number || aid;
+            const albumNumber = info.id || id;
             // 从文件名中提取实际编号（子集下载时 file 是子集编号）
             const fileNumber = Number(path.basename(file, '.zip'));
             comicInfo.web = `${host}/album/${albumNumber}/`;
             // 2、子标题的特殊处理
-            if (fileNumber !== albumNumber && !!episodes && episodes.length > 0) {
-                let ep = episodes.filter((obj) => obj.aid === fileNumber || obj.number === fileNumber)[0];
+            if (fileNumber !== albumNumber && !!series && series.length > 0) {
+                let ep = series.filter((obj) => Number(obj.id) === fileNumber)[0];
                 if (!ep) {
                     console.error(`匹配信息失败，麻烦自行查找：${fileNumber}`);
                     return;
                 }
-                comicInfo.title = `${title}：${ep.title}`;
-                comicInfo.number = ep.index + 1;
+                comicInfo.title = `${title}：${ep.name}`;
+                comicInfo.number = series.indexOf(ep) + 1;
             } else {
                 comicInfo.title = `${title}`;
                 comicInfo.number = 1;

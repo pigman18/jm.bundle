@@ -46,23 +46,23 @@
                 <img v-if="fetchedInfo.cover" class="jmt-add-cover" :src="fetchedInfo.cover" alt="" />
                 <div class="jmt-add-detail">
                   <div class="jmt-add-title">
-                    <span v-if="fetchedInfo.allDone" class="jmt-name-link" @click="readNumber(fetchedInfo.number)">#{{ fetchedInfo.number }} {{ fetchedInfo.title }}</span>
-                    <span v-else>#{{ fetchedInfo.number }} {{ fetchedInfo.title }}</span>
+                    <span v-if="fetchedInfo.allDone" class="jmt-name-link" @click="readNumber(fetchedInfo.id)">#{{ fetchedInfo.id }} {{ fetchedInfo.name }}</span>
+                    <span v-else>#{{ fetchedInfo.id }} {{ fetchedInfo.name }}</span>
                   </div>
                   <n-tag v-if="fetchedInfo.allDone" type="success" size="small">已完成</n-tag>
-                  <div v-else-if="fetchedInfo.episodes.length > 1" class="jmt-add-ep-label">{{ fetchedInfo.episodes.length }} 话</div>
+                  <div v-else-if="fetchedInfo.series.length > 1" class="jmt-add-ep-label">{{ fetchedInfo.series.length }} 话</div>
                   <div v-else class="jmt-add-ep-label">单集漫画</div>
                 </div>
               </div>
-              <div v-if="fetchedInfo.episodes.length > 1" class="jmt-ep-list">
+              <div v-if="fetchedInfo.series.length > 1" class="jmt-ep-list">
                 <div class="jmt-ep-head">
                   <n-checkbox v-model:checked="allChecked" :indeterminate="epSomeChecked" size="small" />全选
                 </div>
-                <div v-for="ep in fetchedInfo.episodes" :key="ep.number" class="jmt-ep-row">
-                  <n-checkbox v-model:checked="epChecked[ep.number]" />
-                  <span class="jmt-ep-num">#{{ ep.number }}</span>
-                  <span v-if="ep.done" class="jmt-ep-title jmt-name-link" @click="readNumber(ep.number)">{{ ep.title }}</span>
-                  <span v-else class="jmt-ep-title">{{ ep.title }}</span>
+                <div v-for="ep in fetchedInfo.series" :key="ep.id" class="jmt-ep-row">
+                  <n-checkbox v-model:checked="epChecked[ep.id]" />
+                  <span class="jmt-ep-num">#{{ ep.id }}</span>
+                  <span v-if="ep.done" class="jmt-ep-title jmt-name-link" @click="readNumber(Number(ep.id))">{{ ep.name }}</span>
+                  <span v-else class="jmt-ep-title">{{ ep.name }}</span>
                   <span v-if="ep.done" style="margin-left:auto;flex-shrink:0;display:flex"><n-tag type="success" size="small">已完成</n-tag></span>
                 </div>
               </div>
@@ -142,36 +142,36 @@ const mode = ref<'query' | 'batch'>('query')
 const addNumber = ref('')
 const addLoading = ref(false)
 
-interface EpisodeInfo {
-  number: number
-  title: string
+interface SeriesInfo {
+  id: string
+  name: string
   done?: boolean
 }
 interface FetchedInfo {
-  number: number
-  title: string
+  id: number
+  name: string
   cover: string
-  episodes: EpisodeInfo[]
+  series: SeriesInfo[]
   allDone?: boolean
 }
 
 const fetchedInfo = ref<FetchedInfo | null>(null)
-const epChecked = reactive<Record<number, boolean>>({})
+const epChecked = reactive<Record<string, boolean>>({})
 const withMeta = ref(true)
 
 const epAllChecked = computed(() => {
-  const eps = fetchedInfo.value?.episodes
-  return eps ? eps.every(e => epChecked[e.number]) : false
+  const eps = fetchedInfo.value?.series
+  return eps ? eps.every(e => epChecked[e.id]) : false
 })
 const epSomeChecked = computed(() => {
-  const eps = fetchedInfo.value?.episodes
-  return eps ? eps.some(e => epChecked[e.number]) && !epAllChecked.value : false
+  const eps = fetchedInfo.value?.series
+  return eps ? eps.some(e => epChecked[e.id]) && !epAllChecked.value : false
 })
 
 function toggleAllEp(val: boolean) {
-  const eps = fetchedInfo.value?.episodes
+  const eps = fetchedInfo.value?.series
   if (!eps) return
-  for (const ep of eps) epChecked[ep.number] = val
+  for (const ep of eps) epChecked[ep.id] = val
 }
 
 const allChecked = computed({
@@ -185,10 +185,10 @@ async function fetchInfo() {
   addLoading.value = true
   fetchedInfo.value = null
   try {
-    const j = await postJson(`/comics/${num}/fetch-info`)
+    const j = await postJson(`/comics/${num}/fetch-meta`)
     if (!j.ok) throw new Error(j.message || '查询失败')
     fetchedInfo.value = j
-    for (const ep of j.episodes) if (!ep.done) epChecked[ep.number] = true
+    for (const ep of j.series) if (!ep.done) epChecked[ep.id] = true
   } catch {
     fetchedInfo.value = null
   } finally {
@@ -198,11 +198,11 @@ async function fetchInfo() {
 
 function getQueryPayload() {
   const info = fetchedInfo.value!
-  const eps = info.episodes.length > 1
-    ? info.episodes.filter(e => epChecked[e.number])
+  const eps = info.series.length > 1
+    ? info.series.filter(e => epChecked[e.id])
     : info.allDone ? []
-    : [{ number: info.number, title: '' }]
-  return { type: 'query', number: info.number, episodes: eps, cover: info.cover, title: info.title, withMeta: withMeta.value }
+    : [{ id: String(info.id), name: '' }]
+  return { type: 'query', number: info.id, episodes: eps, cover: info.cover, title: info.name, withMeta: withMeta.value }
 }
 
 // --- 批量添加 ---
@@ -254,7 +254,7 @@ const canSubmitAdd = computed(() => {
   if (mode.value === 'query') {
     const info = fetchedInfo.value
     if (!info) return false
-    if (info.episodes.length > 1) return Object.values(epChecked).some(Boolean)
+    if (info.series.length > 1) return Object.values(epChecked).some(Boolean)
     return !info.allDone
   }
   return batchNumbers.value.length > 0
@@ -269,11 +269,11 @@ async function handleAdd(payload: any) {
     const { number, episodes, cover, title, withMeta } = payload
     for (const ep of episodes) {
       await postJson(`/comics/${number}/download`, {
-        episodeNumber: ep.number,
+        episodeNumber: Number(ep.id),
         downloadLabel: '',
         coverUrl: cover,
         title,
-        episodeTitle: ep.title,
+        episodeTitle: ep.name,
         withMeta,
       })
     }
