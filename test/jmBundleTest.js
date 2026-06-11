@@ -29,11 +29,11 @@ async function getMeta(number) {
     // await jmBundle.state.crawler.comic.downloadArchive(275942);
     // await jmBundle.state.crawler.search.byKeyword('明日方舟', SearchSort.Latest)
     // 1、获取每周必看期数
-    let weekInfo = await jmBundle.state.crawler.rank.weekInfo();
+    let weekInfo = await jmBundle.state.crawler.rank.monthInfo();
     // 2、获取每周必看
-    let resp1 = await jmBundle.state.crawler.rank.weekly(weekInfo.categories[0].id, null);
-    let resp2 = await jmBundle.state.crawler.rank.weekly(weekInfo.categories[0].id, weekInfo.type[0].id);
-    let resp3 = await jmBundle.state.crawler.rank.weekly(weekInfo.categories[0].id, weekInfo.type[1].id);
-    let resp4 = await jmBundle.state.crawler.rank.weekly(weekInfo.categories[0].id, weekInfo.type[2].id);
+    let resp1 = await jmBundle.state.crawler.rank.monthly(weekInfo.categories[0].id, null);
+    let resp2 = await jmBundle.state.crawler.rank.monthly(weekInfo.categories[0].id, weekInfo.type[0].id);
+    let resp3 = await jmBundle.state.crawler.rank.monthly(weekInfo.categories[0].id, weekInfo.type[1].id);
+    let resp4 = await jmBundle.state.crawler.rank.monthly(weekInfo.categories[0].id, weekInfo.type[2].id);
     console.log(resp1);
 })();

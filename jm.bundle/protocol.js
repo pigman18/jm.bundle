@@ -82,6 +82,8 @@ let ApiPath = {
     GetFavoriteFolder: "/favorite",
     GetWeeklyInfo:  "/week",
     GetWeekly: "/week/filter",
+    GetMonthlyInfo:  "/month",
+    GetMonthly: "/month/filter",
 };
 
 /**

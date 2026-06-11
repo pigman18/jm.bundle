@@ -1216,6 +1216,35 @@ function createCrawler(manifest, ctx, message, config) {
                 list
             }
         },
+        /**
+         * 获取每月必看期数（todo api接口是错的）
+         * @returns {Promise<{JmWeekInfo}>}
+         */
+        monthInfo: async() => {
+            return expireRetry(async () => {
+                return await reqApi(ApiPath.GetMonthlyInfo);
+            });
+        },
+        /**
+         * 获取每月必看（todo api接口是错的）
+         * @param categoryId
+         * @param typeId
+         * @returns {Promise<{total: *, list: JmSearchMeta[]}>}
+         */
+        monthly: async (categoryId, typeId) => {
+            let resp = await reqApi(`${ApiPath.GetMonthly}?${toQueryString({
+                "id": categoryId,
+                "type": typeId
+            })}`);
+            let {
+                total,
+                list
+            } = resp;
+            return {
+                total,
+                list
+            }
+        },
         // 每周最新连载
         serials: async () => {
             let all = {

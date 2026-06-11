@@ -197,7 +197,7 @@ async function saveAxiosResponse(response, dataPath, bakDataPath = dataPath + ".
                     fs.renameSync(bakDataPath, dataPath);
                 } catch (e) {
                     fs.rmSync(bakDataPath);
-                    reject(err);
+                    reject(e);
                 }
             }
             if (onProgress) {
