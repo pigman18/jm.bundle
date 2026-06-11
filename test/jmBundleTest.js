@@ -40,6 +40,6 @@ async function getMeta(number) {
     // console.log(serialization);
     // let categories = await jmBundle.state.crawler.rank.categories();
     // 同人、
-    await jmBundle.state.crawler.rank.categoriesFilter(1, 'a', 'slug', 'mv');
+    await jmBundle.state.crawler.rank.categoriesFilter(1, 'a', 'doujin', 'mv');
     console.log(categories);
 })();

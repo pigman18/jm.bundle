@@ -1,0 +1,282 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "最新A漫",
+      "slug": "",
+      "total_albums": 0
+    },
+    {
+      "id": "1",
+      "name": "同人",
+      "slug": "doujin",
+      "type": "slug",
+      "total_albums": "333896",
+      "sub_categories": [
+        {
+          "CID": "1",
+          "name": "漢化",
+          "slug": "chinese"
+        },
+        {
+          "CID": "2",
+          "name": "日語",
+          "slug": "japanese"
+        },
+        {
+          "CID": "3",
+          "name": "CG圖集",
+          "slug": "CG"
+        },
+        {
+          "CID": "20",
+          "name": "禁漫去碼",
+          "slug": "no_mosaic"
+        },
+        {
+          "CID": "23",
+          "name": "禁漫上色",
+          "slug": "coloring"
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "name": "單本",
+      "slug": "single",
+      "type": "slug",
+      "total_albums": "42051",
+      "sub_categories": [
+        {
+          "CID": "5",
+          "name": "漢化",
+          "slug": "chinese"
+        },
+        {
+          "CID": "6",
+          "name": "日語",
+          "slug": "japanese"
+        },
+        {
+          "CID": "12",
+          "name": "青年漫",
+          "slug": "youth"
+        },
+        {
+          "CID": "21",
+          "name": "禁漫去碼",
+          "slug": "no_mosaic"
+        },
+        {
+          "CID": "24",
+          "name": "禁漫上色",
+          "slug": "coloring"
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "name": "短篇",
+      "slug": "short",
+      "type": "slug",
+      "total_albums": "113296",
+      "sub_categories": [
+        {
+          "CID": "7",
+          "name": "漢化",
+          "slug": "chinese"
+        },
+        {
+          "CID": "8",
+          "name": "日語",
+          "slug": "japanese"
+        },
+        {
+          "CID": "22",
+          "name": "禁漫去碼",
+          "slug": "no_mosaic"
+        },
+        {
+          "CID": "25",
+          "name": "禁漫上色",
+          "slug": "coloring"
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "name": "其他類",
+      "slug": "another",
+      "type": "slug",
+      "total_albums": "51030",
+      "sub_categories": [
+        {
+          "CID": "9",
+          "name": "其他漫畫",
+          "slug": "other"
+        },
+        {
+          "CID": "10",
+          "name": "3D",
+          "slug": "3d"
+        },
+        {
+          "CID": "11",
+          "name": "角色扮演",
+          "slug": "cosplay"
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "name": "韓漫",
+      "slug": "hanman",
+      "type": "slug",
+      "total_albums": "125171",
+      "sub_categories": [
+        {
+          "CID": "19",
+          "name": "漢化",
+          "slug": "chinese"
+        }
+      ]
+    },
+    {
+      "id": "6",
+      "name": "English Manga",
+      "slug": "meiman",
+      "type": "slug",
+      "total_albums": "397288",
+      "sub_categories": [
+        {
+          "CID": "13",
+          "name": "IRODORI",
+          "slug": "irodori"
+        },
+        {
+          "CID": "14",
+          "name": "FAKKU",
+          "slug": "fakku"
+        },
+        {
+          "CID": "15",
+          "name": "18scan",
+          "slug": "18scan"
+        },
+        {
+          "CID": "16",
+          "name": "Manhwa",
+          "slug": "manhwa"
+        },
+        {
+          "CID": "17",
+          "name": "Comic",
+          "slug": "comic"
+        },
+        {
+          "CID": "18",
+          "name": "Other",
+          "slug": "other"
+        }
+      ]
+    },
+    {
+      "id": "7",
+      "name": "一般向韓漫",
+      "slug": "hanmansfw",
+      "type": "slug",
+      "total_albums": "109639",
+      "sub_categories": []
+    },
+    {
+      "id": "7",
+      "name": "Cosplay",
+      "slug": "another_cosplay",
+      "type": "search",
+      "total_albums": 0
+    },
+    {
+      "id": "8",
+      "name": "3D",
+      "type": "search",
+      "slug": "3D",
+      "total_albums": 0
+    },
+    {
+      "id": "9",
+      "name": "禁漫漢化組",
+      "type": "search",
+      "slug": "禁漫漢化組",
+      "total_albums": 0
+    }
+  ],
+  "blocks": [
+    {
+      "title": "主題A漫",
+      "content": [
+        "劇情向",
+        "校園",
+        "純愛",
+        "人妻",
+        "師生",
+        "近親",
+        "百合",
+        "YAOI",
+        "性轉",
+        "NTR",
+        "偽娘",
+        "癡女",
+        "全彩",
+        "女性向"
+      ]
+    },
+    {
+      "title": "角色 / 扮演",
+      "content": [
+        "蘿莉",
+        "禦姐",
+        "熟女",
+        "正太",
+        "巨乳",
+        "貧乳",
+        "女王",
+        "教師",
+        "女僕",
+        "護士",
+        "泳裝",
+        "眼鏡",
+        "連褲襪",
+        "其他制服",
+        "兔女郎"
+      ]
+    },
+    {
+      "title": "特殊PLAY",
+      "content": [
+        "群交",
+        "足交",
+        "SM",
+        "肛交",
+        "阿黑顏",
+        "藥物",
+        "扶他",
+        "調教",
+        "野外露出",
+        "催眠",
+        "自慰",
+        "觸手",
+        "獸交"
+      ]
+    },
+    {
+      "title": "其他",
+      "content": [
+        "CG集",
+        "重口",
+        "獵奇",
+        "非H",
+        "血腥暴力"
+      ]
+    }
+  ]
+}
