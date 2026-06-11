@@ -19,6 +19,7 @@
                 <div class="jmz-header-tabs">
                   <router-link :to="{ name: 'catalog' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'catalog' }">本地管理</router-link>
                   <router-link :to="{ name: 'search' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'search' }">漫画搜索</router-link>
+                  <router-link :to="{ name: 'week' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'week' }">每周必看</router-link>
                 </div>
               </template>
             </div>
@@ -48,7 +49,7 @@
         </header>
         <main class="jmz-app-main">
           <router-view v-slot="{ Component }">
-            <keep-alive :include="['CatalogPage', 'SearchPage']">
+            <keep-alive :include="['CatalogPage', 'SearchPage', 'WeekPage']">
               <component :is="Component" />
             </keep-alive>
           </router-view>
@@ -86,6 +87,8 @@ function openTasks() { showTasks.value = true }
 function backToCatalog() {
   if (route.query.from === 'search') {
     router.push({ name: 'search' })
+  } else if (route.query.from === 'week') {
+    router.push({ name: 'week' })
   } else {
     router.push({ name: 'catalog', query: peekCatalogReturnQuery() })
   }

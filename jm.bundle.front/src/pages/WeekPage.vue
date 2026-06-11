@@ -1,95 +1,128 @@
 <script setup lang="ts">
-import { ref, shallowRef, reactive, onActivated, watch } from 'vue'
+import { ref, shallowRef, reactive, onActivated } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import { SearchOutline } from '@vicons/ionicons5'
-import { buildQuery, getJson, postJson } from '@/api'
+import { getJson, postJson } from '@/api'
 import type { Comic } from '@/types'
+
+interface WeekCategory {
+  id: string
+  title: string
+  time: string
+}
+interface WeekType {
+  id: string
+  title: string
+}
 
 const router = useRouter()
 const route = useRoute()
 const message = useMessage()
 
-const keyword = ref('')
-const sort = ref('mr')
 const loading = ref(false)
 const fetching = ref<Record<number, boolean>>({})
+const categories = shallowRef<WeekCategory[]>([])
+const types = shallowRef<WeekType[]>([])
+const activeCategory = ref('')
+const activeType = ref('')
 const list = shallowRef<Comic[]>([])
 const total = ref(0)
-const pages = ref(0)
-const currentPage = ref(1)
 
 const cachedList = shallowRef<Comic[]>([])
 const cachedTotal = ref(0)
-const cachedPages = ref(0)
+const cachedCategory = ref('')
+const cachedType = ref('')
 const scrollTop = ref(0)
 
-let _syncingUrl = false
-// 从 URL 恢复搜索参数
-watch(() => route.query, (q) => {
-  if (route.name !== 'search' || _syncingUrl) return
-  const kw = String(q.keyword || '').trim()
-  if (!kw) return
-  keyword.value = kw
-  sort.value = String(q.sort || 'mr')
-  currentPage.value = Math.max(1, parseInt(String(q.page || '1'), 10) || 1)
-  if (!cachedList.value.length) doSearch(currentPage.value)
-}, { immediate: true })
+const coverLoaded = reactive<Record<number, boolean>>({})
 
-// 离开前保存滚动位置和列表
+function coverReady(id: number, cover?: string) {
+  return cover && coverLoaded[id]
+}
+function onCoverLoad(id: number) {
+  coverLoaded[id] = true
+}
+function onCoverErr(e: Event, id: number) {
+  const img = e.target as HTMLImageElement
+  if (img && !img.src.includes('data:')) img.src = ''
+  coverLoaded[id] = true
+}
+
 onBeforeRouteLeave((_to, _from, next) => {
   if (list.value.length) {
     cachedList.value = list.value
     cachedTotal.value = total.value
-    cachedPages.value = pages.value
+    cachedCategory.value = activeCategory.value
+    cachedType.value = activeType.value
     scrollTop.value = window.scrollY || 0
   }
   next()
 })
 
-// 从 keep-alive 恢复
 onActivated(() => {
   if (cachedList.value.length > 0) {
     list.value = cachedList.value
     total.value = cachedTotal.value
-    pages.value = cachedPages.value
+    activeCategory.value = cachedCategory.value
+    activeType.value = cachedType.value
     setTimeout(() => window.scrollTo(0, scrollTop.value), 0)
+  } else if (!categories.value.length) {
+    loadWeekInfo()
   }
 })
 
-const sortOptions = [
-  { label: '最新的', value: 'mr' },
-  { label: '最多点阅的', value: 'mv' },
-  { label: '最多图片', value: 'mp' },
-  { label: '最多爱心', value: 'tf' },
-]
+async function loadWeekInfo() {
+  try {
+    const j = await getJson('/week/info')
+    if (!j.ok) throw new Error(j.message || '获取周信息失败')
+    categories.value = j.categories || []
+    const typeOrder = ['manga', 'hanman', 'another']
+    types.value = (j.type || []).slice().sort((a: WeekType, b: WeekType) => {
+      const ai = typeOrder.indexOf(a.id)
+      const bi = typeOrder.indexOf(b.id)
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+    })
+    if (categories.value.length && !activeCategory.value) {
+      activeCategory.value = categories.value[0].id
+      loadComics()
+    }
+  } catch (e: any) {
+    message.error(e.message || '获取周信息失败')
+  }
+}
 
-async function doSearch(page?: number) {
-  const kw = keyword.value.trim()
-  if (!kw) return
-  const p = page ?? currentPage.value
-  currentPage.value = p
-  // 写 URL 便于恢复
-  _syncingUrl = true
-  try { router.replace({ name: 'search', query: { keyword: kw, sort: sort.value, page: String(p) } }) } catch {}
-  _syncingUrl = false
-  // 新搜索时清缓存
-  cachedList.value = []
+async function loadComics() {
+  if (!activeCategory.value) return
   loading.value = true
   list.value = []
   total.value = 0
-  pages.value = 0
+  coverLoaded.value = {}
   try {
-    const j = await getJson(`/search/comics${buildQuery({ keyword: kw, sort: sort.value, page: p })}`)
-    if (!j.ok) throw new Error(j.message || '搜索失败')
+    const params = new URLSearchParams({ categoryId: activeCategory.value })
+    if (activeType.value) params.set('typeId', activeType.value)
+    const j = await getJson(`/week/comics?${params}`)
+    if (!j.ok) throw new Error(j.message || '获取失败')
     list.value = j.list || []
     total.value = j.total || 0
-    pages.value = j.pages || 1
   } catch (e: any) {
-    message.error(e.message || '搜索失败')
+    message.error(e.message || '获取每周必看失败')
   } finally {
     loading.value = false
   }
+}
+
+function onCategoryChange(id: string) {
+  if (id === activeCategory.value) return
+  activeCategory.value = id
+  cachedList.value = []
+  loadComics()
+}
+
+function onTypeClick(id: string) {
+  const next = activeType.value === id ? '' : id
+  activeType.value = next
+  cachedList.value = []
+  loadComics()
 }
 
 async function goDetail(c: Comic) {
@@ -98,58 +131,45 @@ async function goDetail(c: Comic) {
   try {
     const j = await postJson(`/comics/${c.id}/fetch-meta`)
     if (!j.ok) throw new Error(j.message || '获取信息失败')
-    router.push({ name: 'detail', params: { num: String(c.id) }, query: { from: 'search' } })
+    router.push({ name: 'detail', params: { num: String(c.id) }, query: { from: 'week' } })
   } catch (e: any) {
     message.error(e.message || '获取信息失败')
   } finally {
     fetching.value = { ...fetching.value, [c.id]: false }
   }
 }
-
-const coverLoaded = reactive<Record<number, boolean>>({})
-
-function coverReady(id: number, cover?: string) {
-  return cover && coverLoaded[id]
-}
-
-function onCoverLoad(id: number) {
-  coverLoaded[id] = true
-}
-
-function onCoverErr(e: Event, id: number) {
-  const img = e.target as HTMLImageElement
-  if (img && !img.src.includes('data:')) {
-    img.src = ''
-  }
-  coverLoaded[id] = true
-}
 </script>
 
 <template>
-  <div class="jmz-page jmz-search-page">
-    <section class="jmz-panel jmz-panel--pad jmz-search-bar">
-      <div class="jmz-search-row">
-        <n-input
-          v-model:value="keyword"
-          clearable
-          placeholder="输入关键词搜索"
-          @keyup.enter="doSearch(1)"
-        >
-          <template #prefix><n-icon :component="SearchOutline" /></template>
-        </n-input>
+  <div class="jmz-page jmz-week-page">
+    <section class="jmz-panel jmz-panel--pad jmz-week-bar">
+      <div class="jmz-week-categories">
         <n-select
-          v-model:value="sort"
-          :options="sortOptions"
-          class="jmz-search-sort"
+          v-model:value="activeCategory"
+          :options="categories.map(c => ({ label: c.time, value: c.id }))"
+          :loading="loading"
+          @update:value="onCategoryChange"
         />
-        <n-button type="primary" :loading="loading" @click="doSearch(1)">搜索</n-button>
+      </div>
+      <div v-if="types.length" class="jmz-week-types">
+        <button
+          v-for="t in types"
+          :key="t.id"
+          class="jmz-week-type-btn"
+          :class="{ 'jmz-week-type-btn--active': t.id === activeType }"
+          @click="onTypeClick(t.id)"
+        >
+          {{ t.title }}
+        </button>
       </div>
     </section>
 
-    <div class="jmz-search-main">
-      <n-empty v-if="!loading && !list.length && keyword.trim()" description="未找到相关漫画" />
-      <n-empty v-else-if="!loading && !list.length" description="输入关键词开始搜索" />
-      <div v-else-if="list.length > 0" class="jmz-card-grid">
+    <div class="jmz-week-main">
+      <div v-if="loading" class="jmz-week-loading">
+        <n-spin size="small" />
+      </div>
+      <n-empty v-else-if="!loading && !list.length" description="该期暂无内容" />
+      <div v-else-if="list.length" class="jmz-card-grid">
         <article
           v-for="(c, i) in list"
           :key="c.id"
@@ -161,7 +181,7 @@ function onCoverErr(e: Event, id: number) {
           @keyup.enter="goDetail(c)"
         >
           <div class="jmz-card-cover-wrap">
-            <div v-show="!coverReady(c.id, c.cover) && !fetching[c.id]" class="jmz-cover-spinner" aria-hidden="true">
+            <div v-show="!coverReady(c.id, c.cover) && !fetching[c.id]" class="jmz-cover-spinner">
               <n-spin size="small" />
             </div>
             <div v-if="fetching[c.id]" class="jmz-card-fetching-mask">
@@ -187,63 +207,74 @@ function onCoverErr(e: Event, id: number) {
             <h2 class="jmz-card-title">{{ c.name }}</h2>
             <div v-if="c.author && c.author[0]" class="jmz-card-author">{{ c.author[0] }}</div>
             <div v-else class="jmz-card-author jmz-card-author--muted">作者未知</div>
-            <div class="jmz-card-tags" aria-label="标签">
-              <span
-                v-for="t in (c.tags || []).slice(0, 5)"
-                :key="t"
-                class="jmz-chip"
-              >{{ t }}</span>
+            <div class="jmz-card-tags">
+              <span v-for="t in (c.tags || []).slice(0, 5)" :key="t" class="jmz-chip">{{ t }}</span>
               <span v-if="(c.tags || []).length > 5" class="jmz-chip jmz-chip--more">+{{ (c.tags || []).length - 5 }}</span>
               <span v-if="!c.tags || !c.tags.length" class="jmz-chip jmz-chip--ghost">无标签</span>
             </div>
             <div class="jmz-card-foot">
-              <span v-if="c.displayKindLabel" class="jmz-card-kind">{{ c.displayKindLabel }}</span>
               <span v-if="c.total_views" class="jmz-card-pages">{{ c.total_views }}次</span>
               <span v-if="c.likes" class="jmz-card-pages">{{ c.likes }}❤</span>
-              <span v-if="c.updateDate" class="jmz-card-date">{{ c.updateDate }}</span>
             </div>
           </div>
         </article>
       </div>
-      <div v-if="pages > 1" class="jmz-search-pager">
-        <n-pagination
-          v-model:page="currentPage"
-          :page-count="pages"
-          :show-size-picker="false"
-          @update:page="doSearch"
-        />
-      </div>
-      <div v-if="total > 0" class="jmz-search-info">
-        共 {{ total }} 条结果
-      </div>
+      <div v-if="total > 0" class="jmz-week-info">共 {{ total }} 条</div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.jmz-search-page {
+.jmz-week-page {
 }
 
-.jmz-search-bar {
+.jmz-week-bar {
   margin-bottom: 16px;
 }
 
-.jmz-search-row {
+.jmz-week-categories {
+  margin-bottom: 12px;
+}
+
+.jmz-week-types {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 6px;
 }
 
-.jmz-search-row > :first-child {
-  flex: 1;
+.jmz-week-type-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(46, 46, 53, 0.7);
+  background: transparent;
+  color: #9b9bb4;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.jmz-week-type-btn:hover {
+  background: rgba(46, 46, 53, 0.8);
+  color: #c4c4d6;
+}
+.jmz-week-type-btn--active {
+  background: #1a5cdb;
+  color: #fff;
 }
 
-.jmz-search-sort {
-  width: 130px;
-}
-
-.jmz-search-main {
+.jmz-week-main {
   min-height: 200px;
+}
+
+.jmz-week-loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.jmz-week-info {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: #7a7a8a;
 }
 
 .jmz-card-grid {
@@ -263,12 +294,10 @@ function onCoverErr(e: Event, id: number) {
   transition: transform 0.15s, box-shadow 0.15s;
   position: relative;
 }
-
 .jmz-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
-
 .jmz-card--fetching {
   opacity: 0.6;
   pointer-events: none;
@@ -305,12 +334,10 @@ function onCoverErr(e: Event, id: number) {
   color: #fff;
   pointer-events: none;
 }
-
 .jmz-card-ribbon--new {
   background: rgba(80, 80, 90, 0.75);
   color: #b0b0c0;
 }
-
 .jmz-card-ribbon--read {
   left: auto;
   right: 8px;
@@ -336,7 +363,6 @@ function onCoverErr(e: Event, id: number) {
   opacity: 0;
   transition: opacity 0.25s;
 }
-
 .jmz-card-cover--show {
   opacity: 1;
 }
@@ -375,7 +401,6 @@ function onCoverErr(e: Event, id: number) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .jmz-card-author--muted {
   color: #6a6a7a;
 }
@@ -397,31 +422,8 @@ function onCoverErr(e: Event, id: number) {
   align-items: center;
 }
 
-.jmz-card-kind {
-  color: #8b8be0;
-  font-weight: 600;
-}
-
 .jmz-card-pages {
   font-variant-numeric: tabular-nums;
-}
-
-.jmz-card-date {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.jmz-search-pager {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
-}
-
-.jmz-search-info {
-  margin-top: 12px;
-  text-align: center;
-  font-size: 13px;
-  color: #7a7a8a;
 }
 
 @media (min-width: 720px) {
