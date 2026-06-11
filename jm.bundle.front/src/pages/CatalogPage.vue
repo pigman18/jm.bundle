@@ -35,7 +35,7 @@ const filters = reactive({
   number: '',
   tags: [] as string[],
   kind: '',
-  sort: 'id',
+  sort: 'update_time',
   order: 'desc',
   page: 1,
   pageSize: 10,
@@ -76,7 +76,7 @@ function readFiltersFromRoute() {
   const ts = scalarQ(q.tags)
   filters.tags = ts ? ts.split(',').map(x => x.trim()).filter(Boolean) : []
   filters.kind = scalarQ(q.kind)
-  filters.sort = scalarQ(q.sort) || 'id'
+  filters.sort = scalarQ(q.sort) || 'update_time'
   filters.order = scalarQ(q.order) || 'desc'
   const p = parseInt(scalarQ(q.page), 10)
   filters.page = Number.isFinite(p) && p >= 1 ? p : 1
@@ -91,7 +91,7 @@ function filtersToQuery(): Record<string, string> {
   if (filters.number.trim()) q.number = filters.number.trim()
   if (filters.tags.length) q.tags = filters.tags.join(',')
   if (filters.kind) q.kind = filters.kind
-  if (filters.sort !== 'id') q.sort = filters.sort
+  if (filters.sort !== 'update_time') q.sort = filters.sort
   if (filters.order !== 'desc') q.order = filters.order
   if (filters.page > 1) q.page = String(filters.page)
   if (filters.pageSize !== 10) q.pageSize = String(filters.pageSize)
@@ -298,7 +298,8 @@ const sortOptions = [
   { label: '标题', value: 'name' },
   { label: '浏览', value: 'total_views' },
   { label: '点赞', value: 'likes' },
-  { label: '时间', value: 'addtime' },
+  { label: '元数据更新时间', value: 'update_time' },
+  { label: '元数据录入时间', value: 'create_time' },
 ]
 const orderOptions = [
   { label: '降序', value: 'desc' },

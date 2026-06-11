@@ -326,13 +326,15 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
     }
 
     function handleComicsList(app, api) {
-        const sortMap = {
-            id: 'id',
-            name: 'name',
-            total_views: 'total_views',
-            likes: 'likes',
-            addtime: 'addtime',
-        };
+    const sortMap = {
+      id: 'id',
+      name: 'name',
+      total_views: 'total_views',
+      likes: 'likes',
+      addtime: 'addtime',
+      create_time: 'create_time',
+      update_time: 'update_time',
+    };
         app.get(`${api}/comics`, async (req, res) => {
             try {
                 const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);

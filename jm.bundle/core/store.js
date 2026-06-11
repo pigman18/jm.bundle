@@ -22,12 +22,14 @@ function createStore(manifest, ctx, message, config, crawler) {
     INSERT INTO comic_meta (
       id, name, images, addtime, description, total_views, likes,
       series, series_id, comment_total, author, tags, works, actors,
-      related_list, liked, is_favorite, is_aids, price, purchased
+      related_list, liked, is_favorite, is_aids, price, purchased,
+      create_time, update_time
     )
     VALUES (
       @id, @name, @images, @addtime, @description, @total_views, @likes,
       @series, @series_id, @comment_total, @author, @tags, @works, @actors,
-      @related_list, @liked, @is_favorite, @is_aids, @price, @purchased
+      @related_list, @liked, @is_favorite, @is_aids, @price, @purchased,
+      strftime('%s','now'), strftime('%s','now')
     )
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
@@ -48,7 +50,9 @@ function createStore(manifest, ctx, message, config, crawler) {
       is_favorite = EXCLUDED.is_favorite,
       is_aids = EXCLUDED.is_aids,
       price = EXCLUDED.price,
-      purchased = EXCLUDED.purchased;
+      purchased = EXCLUDED.purchased,
+      create_time = comic_meta.create_time,
+      update_time = strftime('%s','now');
   `;
 
     function jsonRowToDb(obj) {
@@ -110,6 +114,8 @@ function createStore(manifest, ctx, message, config, crawler) {
             is_aids: !!row.is_aids,
             price: row.price,
             purchased: row.purchased,
+            create_time: row.create_time,
+            update_time: row.update_time,
         };
     }
 
@@ -124,9 +130,13 @@ function createStore(manifest, ctx, message, config, crawler) {
         total_views TEXT, likes TEXT, series JSON, series_id TEXT,
         comment_total TEXT, author JSON, tags JSON, works JSON,
         actors JSON, related_list JSON, liked INTEGER, is_favorite INTEGER,
-        is_aids INTEGER, price INTEGER, purchased TEXT
+        is_aids INTEGER, price INTEGER, purchased TEXT,
+        create_time INTEGER, update_time INTEGER
       );
     `);
+        // 兼容旧表：可能缺少 create_time / update_time
+        try { database.exec('ALTER TABLE comic_meta ADD COLUMN create_time INTEGER'); } catch (_) {}
+        try { database.exec('ALTER TABLE comic_meta ADD COLUMN update_time INTEGER'); } catch (_) {}
         return database;
     }
 

@@ -199,6 +199,18 @@ class JmMeta {
      */
     purchased;
 
+    /**
+     * 录入时间（store 专用字段，UNIX 时间戳）
+     * @type {number}
+     */
+    create_time;
+
+    /**
+     * 更新时间（store 专用字段，UNIX 时间戳）
+     * @type {number}
+     */
+    update_time;
+
     constructor(data) {
         this.id = data.id
         this.name = data.name
@@ -220,6 +232,8 @@ class JmMeta {
         this.is_aids = data.is_aids
         this.price = data.price
         this.purchased = data.purchased
+        this.create_time = data.create_time
+        this.update_time = data.update_time
     }
 }
 
