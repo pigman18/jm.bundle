@@ -22,8 +22,7 @@ let defaultConfig = {
         "https://www.cdnhjk.net",
         "https://www.cdngwc.cc",
         "https://www.cdngwc.net",
-        "https://www.cdngwc.club",
-        "https://www.cdnhjk.cc",
+        "https://www.cdngwc.club"
     ],
     "headless": false
 };

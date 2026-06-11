@@ -11,7 +11,7 @@ const {connect} = require('puppeteer-real-browser');
 const AsyncLock = require('async-lock');
 const lock = new AsyncLock();
 
-const {PHASE, STATE, STEP, ERR} = require('../protocol');
+const {ApiPath, SearchSort, PHASE, STATE, STEP, ERR} = require('../protocol');
 const {retryAndCatch, zipText, unZipText} = require('../../util/common');
 const {safeClose} = require('../../util/cloudflare');
 const {mergeCookie} = require('../../util/cookie');
@@ -49,8 +49,7 @@ function createCrawler(manifest, ctx, message, config) {
         "https://www.cdnhjk.net",
         "https://www.cdngwc.cc",
         "https://www.cdngwc.net",
-        "https://www.cdngwc.club",
-        "https://www.cdnhjk.cc",
+        "https://www.cdngwc.club"
     ];
     let requestExtraHeaders = {
         'sec-ch-ua-arch': '"x86"'
@@ -197,10 +196,11 @@ function createCrawler(manifest, ctx, message, config) {
     /**
      * 请求api接口
      * @param uri
+     * @param data
      * @param get
      * @return {Promise<string|null>}
      */
-    async function reqApi(uri, get = true) {
+    async function reqApi(uri, data, get = true) {
         let apiHost = apiHosts[Math.floor(Math.random() * apiHosts.length)];
         let {
             ts,
@@ -214,20 +214,20 @@ function createCrawler(manifest, ctx, message, config) {
                 }
             });
         } else {
-            resp = await httpClient.post(`${apiHost}${uri}`, {
+            resp = await httpClient.post(`${apiHost}${uri}`, data ,{
                 headers: {
                     ...headers
                 }
             });
         }
-        let data = resp?.data?.data || '';
-        if (!data) {
+        let result = resp?.data?.data || '';
+        if (!result) {
             return null;
         }
-        if (Array.isArray(data) && data.length === 0) {
+        if (Array.isArray(result) && result.length === 0) {
             return null;
         }
-        return decodeRespData(resp?.data?.data || '', ts);
+        return decodeRespData(result, ts);
     }
 
     /**
@@ -1155,17 +1155,35 @@ function createCrawler(manifest, ctx, message, config) {
         }
     };
     let search = {
-        // 关键字搜索
-        byKeyword: async (keyword) => {
-            let url = `https://18comic.vip/search/photos?search_query=${keyword}&search-type=photos&main_tag=0`;
-            let label = `关键字搜索-${keyword}`;
-            return expireRetry(async () => {
-                let albums = [];
-                await pageAlbums(url, label, async (pageInfo) => {
-                    albums.push(...(pageInfo.list || []));
-                });
-                return albums;
-            });
+        /**
+         * 关键字搜索
+         * @param keyword                   关键字
+         * @param page                      第几页
+         * @param sort {SearchSort}         排序
+         * @return {Promise<Object>}
+         */
+        byKeyword: async (keyword, page = 1, sort= SearchSort.Latest) => {
+            // 1、请求到内容
+            let resp = await reqApi(`${ApiPath.Search}?${toQueryString({
+                "main_tag": 0,
+                "search_query": keyword,
+                "page": page,
+                "o": sort,
+            })}`);
+            // 2、获取总数，列表
+            let {
+                search_query,
+                total,
+                content
+            } = resp;
+            // 3、获取元信息
+            return {
+                search_query,
+                total,
+                content,
+                // pageSize固定为80，手动计算总页数
+                pages: Math.ceil(total / 80)
+            };
         }
     };
     let rank = {
@@ -1237,6 +1255,7 @@ function createCrawler(manifest, ctx, message, config) {
         comic,
         search,
         rank,
+        reqApi
     };
 }
 

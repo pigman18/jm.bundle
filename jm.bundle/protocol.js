@@ -72,6 +72,18 @@ let ERR = {
     COMIC_PAY_ERROR: {code: -32, message: '收费本下载失败', status: 404},
 };
 
+let ApiPath = {
+    Login: "/login",
+    GetUserProfile: "/login",
+    Search: "/search",
+    GetMeta: "/album",
+    GetChapter:  "/chapter",
+    GetScrambleId: "/chapter_view_template",
+    GetFavoriteFolder: "/favorite",
+    GetWeeklyInfo:  "/week",
+    GetWeekly: "/week/filter",
+};
+
 /**
  * 漫画元信息
  */
@@ -234,10 +246,105 @@ class JmMeta {
     }
 }
 
+/**
+ * 漫画搜索元信息
+ */
+class JmSearchMeta {
+    /**
+     * 漫画ID
+     * @type {string|number}
+     */
+    id;
+
+    /**
+     * 漫画名称
+     * @type {string}
+     */
+    name;
+
+    /**
+     * 描述/简介
+     * @type {string}
+     */
+    description;
+
+    /**
+     * 作者
+     * @type {string[]}
+     */
+    author;
+
+    /**
+     * 标签
+     * @type {string[]}
+     */
+    tags;
+
+    /**
+     * 图片
+     * @type {string}
+     */
+    image;
+
+    /**
+     * 分类
+     * @type {{ id: string, title: string}}
+     */
+    category;
+
+    /**
+     * 子分类
+     * @type {{ id: string, title: string}}
+     */
+    category_sub;
+
+    /**
+     * 当前用户是否点赞
+     * @type {boolean}
+     */
+    liked;
+
+    /**
+     * 是否收藏
+     * @type {boolean}
+     */
+    is_favorite;
+
+    /**
+     * 修改时间
+     * @type {number}
+     */
+    update_at;
+
+    constructor(id, name, description, author, tags, image, category, category_sub, liked, is_favorite, update_at) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.author = author;
+        this.tags = tags;
+        this.image = image;
+        this.category = category;
+        this.category_sub = category_sub;
+        this.liked = liked;
+        this.is_favorite = is_favorite;
+        this.update_at = update_at;
+    }
+}
+
+let SearchSort = {
+    Latest: "mr",
+    View: "mv",
+    Picture: "mp",
+    Like: "tf"
+};
+
 module.exports = {
     PHASE,
     STEP,
     STATE,
     ERR,
-    JmMeta
+    ApiPath,
+    JmMeta,
+    JmSearchMeta,
+    SearchSort
 };
