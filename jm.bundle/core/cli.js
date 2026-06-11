@@ -225,7 +225,7 @@ function createCli(
         .description('查询漫画')
         .option('-f, --file <file>')
         .action(async (number, opts) => {
-            const action = (n) => crawler.album.getMeta(n);
+            const action = (n) => crawler.comic.getMeta(n);
             if (number) return runSingle('拉取元数据', number, action);
             if (opts.file) return runBatch('拉取元数据', opts.file, action, (numbers) => {
                 return numbers.filter((number) => !existsHtmlFlag(number));
@@ -245,7 +245,7 @@ Examples:
         .action(async (number, opts) => {
             const action = async (n) => {
                 try {
-                    await crawler.album.downloadArchive(n);
+                    await crawler.comic.downloadArchive(n);
                 } catch (e) {
                     console.error(`下载漫画失败：${number} ${e}`);
                 }
@@ -337,7 +337,7 @@ Examples:
                 console.log(`\n[${new Date().toLocaleString()}] 开始下载第 ${lineNumber} 行：${number}`);
 
                 try {
-                    await crawler.album.downloadArchive(number);
+                    await crawler.comic.downloadArchive(number);
                     console.log(`✅ 下载完成：${number}`);
 
                     // 追加到完成记录文件

@@ -234,7 +234,7 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
 
   async function startDownload(task, afterSteps = null) {
     try {
-      const result = await crawler.album.downloadArchive(task.number, true, null);
+      const result = await crawler.comic.downloadArchive(task.number, true, null);
       if (result?.file) {
         // 注入元信息步骤（仅当 withMeta 为 true 且有 afterSteps）
         if (task.withMeta && afterSteps) {

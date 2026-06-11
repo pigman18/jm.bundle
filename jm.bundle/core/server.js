@@ -409,7 +409,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         app.post(`${api}/comics/:num/fetch-meta`, async (req, res) => {
             try {
                 const n = Math.floor(Number(req.params.num));
-                const info = await crawler.album.getMeta(n);
+                const info = await crawler.comic.getMeta(n);
                 if (!info) {
                     res.json({ok: false, message: '无可用信息或编号无效'});
                     return;
@@ -507,9 +507,9 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                     const afterSteps = async ({file}) => {
                         if (!withMeta) return;
                         try {
-                            const albumInfo = await crawler.album.getMeta(album);
+                            const albumInfo = await crawler.comic.getMeta(album);
                             if (albumInfo) {
-                                await crawler.album.appendComicInfo2Archive(albumInfo, file);
+                                await crawler.comic.appendComicInfo2Archive(albumInfo, file);
                             }
                         } catch (_) {
                         }
@@ -553,7 +553,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
                     if (!withMeta) return;
                     try {
                         const albumInfo = await crawler.album.getMeta(num);
-                        if (albumInfo) await crawler.album.appendComicInfo2Archive(albumInfo, file);
+                        if (albumInfo) await crawler.comic.appendComicInfo2Archive(albumInfo, file);
                     } catch (_) {
                     }
                 };

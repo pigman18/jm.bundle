@@ -227,7 +227,7 @@ function createStore(manifest, ctx, message, config, crawler) {
         let imported = 0;
         await saveOrUpdateBatch(numbers, async (number) => {
             try {
-                let info = await crawler.album.getMeta(number);
+                let info = await crawler.comic.getMeta(number);
                 if (!info) {
                     return null;
                 }

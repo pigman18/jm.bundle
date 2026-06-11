@@ -49,7 +49,7 @@
         "icon": "$(folder-opened)"
       },
       {
-        "command": "jm.album.downloadArchive",
+        "command": "jm.comic.downloadArchive",
         "title": "下载漫画",
         "icon": "$(book)"
       },
@@ -147,7 +147,7 @@
           "group": "navigation"
         },
         {
-          "command": "jm.album.downloadArchive",
+          "command": "jm.comic.downloadArchive",
           "when": "view == jmView",
           "group": "navigation"
         },

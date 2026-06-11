@@ -7,7 +7,6 @@
 let PHASE = {
     LOGIN: 'login',
     GET_META: 'get_meta',
-    FETCH_INFO_HTML: 'fetch_info_html',
     FETCH_COMIC: 'fetch_comic',
     FETCH_FILE: 'fetch_file',
     FETCH_COMIC_PAGE: 'fetch_comic_page',
@@ -27,8 +26,6 @@ let STEP = {
     CLOUD_FLARE_COOKIE: 'cloud_flare_cookie',
     LOGIN_API: 'login_api',
     INDEX_PAGE: 'index_page',
-    // fetch info
-    INFO_PAGE: 'info_page',
     // fetch comic
     DOWNLOAD_PAGE: 'download_page',
     CAPTCHA: 'captcha',

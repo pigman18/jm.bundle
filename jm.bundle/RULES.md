@@ -37,7 +37,7 @@ jm.bundle.js
 | `server.js`  | HTTP + WebSocket 服务，API 路由，静态文件托管，WS 消息路由到 taskManager |
 | `taskManager.js` | 下载任务管理：持久化列表、队列调度、调用 crawler 下载、通过 server.sendMessage 广播进度 |
 | `message.js` | 任务生命周期管理（phase/step），广播进度到所有 dispatcher |
-| `cli.js`     | 命令行入口，直接调用 `crawler.album.downloadArchive()` |
+| `cli.js`     | 命令行入口，直接调用 `crawler.comic.downloadArchive()` |
 
 - 支持两种运行模式：`activate()`（插件模式）和 `run(argv)`（CLI 模式）
 - 所有模块通过 `manifest` 和上下文 `ctx` 进行依赖注入

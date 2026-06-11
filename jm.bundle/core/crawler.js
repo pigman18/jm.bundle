@@ -167,10 +167,10 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     /**
-     * 判断当前是否登录中
+     * 判断当前是否网页登录中
      * @return {Promise<boolean>}
      */
-    async function isLogin() {
+    async function isWebLogin() {
         try {
             // 1、访问【個人資料】页面，如果有@用户名，则说明是登录中
             let res = await httpClient.get(`${config.host}/user/${config.username}/notice`);
@@ -239,7 +239,7 @@ function createCrawler(manifest, ctx, message, config) {
         return retryAndCatch(func, async (err) => {
             if (403 === err.status) {
                 // 出现403错误，需要重新登录
-                await login(err.phase, err.phaseData);
+                await webLogin(err.phase, err.phaseData);
                 // 不退出继续重试
                 return false;
             }
@@ -407,14 +407,14 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     /**
-     * 进行 JM 登录（有锁）
+     * 进行 JM 网页登录（有锁）
      * 1、通过 cloudflare 校验，获取 cf_clearance、ipcountry、ipm5、theme=light、AVS、sticky 这些 cookie 头
      * 2、GET 访问/albums/meiman 页面，会返回 set-cookie，ipcountry、ipm5
      * 3、POST 请求/login 接口，继续追加 cookie
      * 4、再次跳转会/albums/meiman 页面
      * @return {Promise<{cookie, userAgent, username}|*>}
      */
-    async function login(phase = PHASE.LOGIN, phaseData = {}) {
+    async function webLogin(phase = PHASE.LOGIN, phaseData = {}) {
         phase = phase || PHASE.LOGIN;
         phaseData = phaseData || {};
         // 1、定义使用到的页面、api
@@ -511,7 +511,7 @@ function createCrawler(manifest, ctx, message, config) {
                 }
             };
             // 3、判断当前是否登录中
-            let isUserLogin = await isLogin();
+            let isUserLogin = await isWebLogin();
             if (!isUserLogin) {
                 setCookie('');
                 // 4、执行步骤过程
@@ -552,55 +552,6 @@ function createCrawler(manifest, ctx, message, config) {
                 meta: data
             };
         }, {number});
-    }
-
-    /**
-     * 拉取漫画基本信息原始网页（base64 压缩）
-     * @param number
-     * @param phase
-     * @return {Promise<*>}
-     */
-    async function fetchAlbumHtml(number, phase = PHASE.FETCH_INFO_HTML) {
-        // 1、定义使用到的页面、api
-        let PAGE_INFO = `${config.host}/album/${number}/`;
-        return await message.doPhase(phase || PHASE.FETCH_INFO_HTML, async (stepHandler) => {
-            // 3、请求详情页内容
-            let res = await httpClient.post(PAGE_INFO, {});
-            let html = (res.data || '').trim();
-            // 4、网页内容为空时，需要清空当前 cookie 登录后再请求
-            if (!html) {
-                setCookie('');
-                await login();
-                return fetchAlbumHtml(number);
-            }
-            if (html.includes("album_missing")) {
-                // 5、漫画信息不存在
-                return {
-                    success: false,
-                    number,
-                    html: ''
-                }
-            }
-            return {
-                success: true,
-                number,
-                html
-            };
-        }, {number});
-    }
-
-    /**
-     * 获取预先要存放的结果
-     * @param number
-     * @return {object}
-     */
-    function getPreResult(number) {
-        return {
-            htmlFile: `${infoHtmlDir}/${number}.txt`,
-            infoFile: `${infoDir}/${number}.json`,
-            coverFile: `${fileDir}/${host.split('https://').join('').split('http://').join('')}/media/albums${number}.jpg`,
-            comicFile: `${comicDir}/${number}.zip`,
-        }
     }
 
     /**
@@ -1049,7 +1000,7 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     async function init() {
-        await login();
+        await webLogin();
     }
 
     async function close() {
@@ -1057,11 +1008,11 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     let account = {
-        login: login,
+        webLogin: webLogin,
         sign: sign
     };
 
-    let album = {
+    let comic = {
         // 获取漫画元信息
         getMeta: async (number, phase = PHASE.GET_META) => {
             number = parseNumber(number);
@@ -1279,13 +1230,11 @@ function createCrawler(manifest, ctx, message, config) {
 
     return {
         httpClient,
-        isLogin,
-        getPreResult,
         close,
         init,
         fetchRemoteFile,
         account,
-        album,
+        comic,
         search,
         rank,
     };

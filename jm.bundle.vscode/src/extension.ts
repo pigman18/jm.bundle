@@ -128,7 +128,7 @@ function registerCommand(context: vscode.ExtensionContext) {
             );
         })
     );
-    context.subscriptions.push(vscode.commands.registerCommand('jm.album.downloadArchive', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('jm.comic.downloadArchive', async () => {
         if (!jmBundle) {
             vscode.window.showErrorMessage('JM 主模块尚未加载');
             return;
@@ -144,7 +144,7 @@ function registerCommand(context: vscode.ExtensionContext) {
             }
         });
         if (!input) return;
-        await jmBundle.state.crawler.album.downloadArchive(Number(input), false);
+        await jmBundle.state.crawler.comic.downloadArchive(Number(input), false);
     }));
     context.subscriptions.push(
         vscode.commands.registerCommand('jm.openBrowser', () => {
