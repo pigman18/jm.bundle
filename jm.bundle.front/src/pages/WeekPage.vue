@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, reactive, onActivated } from 'vue'
+import { ref, shallowRef, reactive, watch, onActivated } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { getJson, postJson } from '@/api'
@@ -34,7 +34,22 @@ const cachedCategory = ref('')
 const cachedType = ref('')
 const scrollTop = ref(0)
 
+let _syncingUrl = false
+
+// 从 URL 恢复参数
+watch(() => route.query, (q) => {
+  if (route.name !== 'week' || _syncingUrl) return
+  const cat = String(q.category || '')
+  const typ = String(q.type || '')
+  if (!cat) return
+  activeCategory.value = cat
+  activeType.value = typ || ''
+  if (!cachedList.value.length) loadComics()
+}, { immediate: true })
+
 const coverLoaded = reactive<Record<number, boolean>>({})
+
+function cardToneClass(index: number) { return `tone-${(index % 4) + 1}` }
 
 function coverReady(id: number, cover?: string) {
   return cover && coverLoaded[id]
@@ -84,6 +99,9 @@ async function loadWeekInfo() {
     })
     if (categories.value.length && !activeCategory.value) {
       activeCategory.value = categories.value[0].id
+      _syncingUrl = true
+      try { router.replace({ name: 'week', query: { category: activeCategory.value } }) } catch {}
+      _syncingUrl = false
       loadComics()
     }
   } catch (e: any) {
@@ -111,10 +129,20 @@ async function loadComics() {
   }
 }
 
+function syncUrl() {
+  _syncingUrl = true
+  try {
+    const q: Record<string, string> = { category: activeCategory.value }
+    if (activeType.value) q.type = activeType.value
+    router.replace({ name: 'week', query: q })
+  } catch {}
+  _syncingUrl = false
+}
+
 function onCategoryChange(id: string) {
-  if (id === activeCategory.value) return
   activeCategory.value = id
   cachedList.value = []
+  syncUrl()
   loadComics()
 }
 
@@ -122,6 +150,7 @@ function onTypeClick(id: string) {
   const next = activeType.value === id ? '' : id
   activeType.value = next
   cachedList.value = []
+  syncUrl()
   loadComics()
 }
 
@@ -147,6 +176,7 @@ async function goDetail(c: Comic) {
         <n-select
           v-model:value="activeCategory"
           :options="categories.map(c => ({ label: c.time, value: c.id }))"
+          :disabled="loading"
           :loading="loading"
           @update:value="onCategoryChange"
         />
@@ -157,6 +187,7 @@ async function goDetail(c: Comic) {
           :key="t.id"
           class="jmz-week-type-btn"
           :class="{ 'jmz-week-type-btn--active': t.id === activeType }"
+          :disabled="loading"
           @click="onTypeClick(t.id)"
         >
           {{ t.title }}
@@ -165,16 +196,26 @@ async function goDetail(c: Comic) {
     </section>
 
     <div class="jmz-week-main">
-      <div v-if="loading" class="jmz-week-loading">
-        <n-spin size="small" />
-      </div>
-      <n-empty v-else-if="!loading && !list.length" description="该期暂无内容" />
-      <div v-else-if="list.length" class="jmz-card-grid">
+      <n-empty v-if="!loading && !list.length" description="该期暂无内容" />
+      <div
+        v-else-if="list.length > 0 || loading"
+        class="jmz-card-grid-wrap"
+        :class="{ 'jmz-card-grid-wrap--dim': loading && list.length > 0 }"
+      >
+        <div v-if="loading && list.length > 0" class="jmz-list-reload-mask">
+          <n-spin size="medium" />
+        </div>
+        <div v-if="loading && !list.length" class="jmz-card-grid jmz-skel-grid">
+          <div v-for="i in 10" :key="'sk' + i" :class="['jmz-card', 'jmz-skel-card', cardToneClass(i - 1)]">
+            <div class="jmz-skel-cover" />
+            <div class="jmz-skel-lines" />
+          </div>
+        </div>
+        <div v-if="list.length > 0" class="jmz-card-grid">
         <article
           v-for="(c, i) in list"
           :key="c.id"
-          class="jmz-card"
-          :class="{ 'jmz-card--fetching': fetching[c.id] }"
+          :class="['jmz-card', cardToneClass(i), fetching[c.id] ? 'jmz-card--fetching' : '']"
           role="button"
           tabindex="0"
           @click="goDetail(c)"
@@ -219,6 +260,7 @@ async function goDetail(c: Comic) {
           </div>
         </article>
       </div>
+      </div>
       <div v-if="total > 0" class="jmz-week-info">共 {{ total }} 条</div>
     </div>
   </div>
@@ -251,6 +293,10 @@ async function goDetail(c: Comic) {
   cursor: pointer;
   transition: all 0.15s;
 }
+.jmz-week-type-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .jmz-week-type-btn:hover {
   background: rgba(46, 46, 53, 0.8);
   color: #c4c4d6;
@@ -260,14 +306,56 @@ async function goDetail(c: Comic) {
   color: #fff;
 }
 
-.jmz-week-main {
+.jmz-card-grid-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
   min-height: 200px;
+  margin-top: 16px;
+}
+.jmz-list-reload-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 16, 20, 0.6);
+  pointer-events: none;
+}
+.jmz-card-grid-wrap--dim {
+  opacity: 0.65;
+  pointer-events: none;
+}
+.jmz-skel-grid {
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.jmz-skel-card {
+  cursor: default;
+  pointer-events: none;
+}
+.jmz-skel-cover {
+  aspect-ratio: 3 / 4;
+  background: linear-gradient(90deg, #2a2a30 0%, #35353d 50%, #2a2a30 100%);
+  background-size: 200% 100%;
+  animation: jmz-shimmer 1.1s ease-in-out infinite;
+  border-radius: 8px 8px 0 0;
+}
+.jmz-skel-lines {
+  height: 72px;
+  margin: 12px 14px 14px;
+  border-radius: 8px;
+  background: #2a2a30;
+}
+@keyframes jmz-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
-.jmz-week-loading {
-  display: flex;
-  justify-content: center;
-  padding: 40px 0;
+.jmz-week-main {
+  min-height: 200px;
 }
 
 .jmz-week-info {
@@ -279,24 +367,35 @@ async function goDetail(c: Comic) {
 
 .jmz-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
 }
 
 .jmz-card {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
   border-radius: 8px;
+  background: linear-gradient(180deg, #22222a 0%, #1a1a20 100%);
+  border: 1px solid #2e2e35;
+  border-left: 4px solid #3b82f6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 12px 28px rgba(0, 0, 0, 0.3);
   overflow: hidden;
-  background: #1e1e22;
-  border: 1px solid rgba(46, 46, 53, 0.95);
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-  position: relative;
+  outline: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
-.jmz-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+.jmz-card.tone-1 { border-left-color: #3b82f6; }
+.jmz-card.tone-2 { border-left-color: #8b5cf6; }
+.jmz-card.tone-3 { border-left-color: #10b981; }
+.jmz-card.tone-4 { border-left-color: #f59e0b; }
+.jmz-card:hover,
+.jmz-card:focus-visible {
+  transform: translateY(-3px);
+  border-color: #3d3d4a;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15), 0 18px 40px rgba(0, 0, 0, 0.4);
 }
 .jmz-card--fetching {
   opacity: 0.6;
@@ -426,9 +525,5 @@ async function goDetail(c: Comic) {
   font-variant-numeric: tabular-nums;
 }
 
-@media (min-width: 720px) {
-  .jmz-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-}
+
 </style>
