@@ -9,12 +9,19 @@
             <div class="jmz-header-left">
               <n-button text size="small" class="jmz-app-back" v-if="isDetail" @click="backToCatalog">
                 <template #icon><n-icon :component="ArrowBack" /></template>
-                目录
+                返回
               </n-button>
               <img src="/icon.ico" class="jmz-app-logo" alt="" />
               <span class="jmz-app-title">JM</span>
             </div>
-            <div class="jmz-header-center"></div>
+            <div class="jmz-header-center">
+              <template v-if="!isDetail">
+                <div class="jmz-header-tabs">
+                  <router-link :to="{ name: 'catalog' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'catalog' }">本地管理</router-link>
+                  <router-link :to="{ name: 'search' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'search' }">漫画搜索</router-link>
+                </div>
+              </template>
+            </div>
             <div class="jmz-header-right">
               <template v-if="!isDetail">
                 <div class="jmz-header-sync-group">
@@ -41,7 +48,7 @@
         </header>
         <main class="jmz-app-main">
           <router-view v-slot="{ Component }">
-            <keep-alive :include="['CatalogPage']">
+            <keep-alive :include="['CatalogPage', 'SearchPage']">
               <component :is="Component" />
             </keep-alive>
           </router-view>
@@ -76,7 +83,13 @@ provide('jmzOpenTasks', () => { showTasks.value = true })
 provide('sendWs', (msg: string) => { try { ws?.send(msg) } catch {} })
 
 function openTasks() { showTasks.value = true }
-function backToCatalog() { router.push({ name: 'catalog', query: peekCatalogReturnQuery() }) }
+function backToCatalog() {
+  if (route.query.from === 'search') {
+    router.push({ name: 'search' })
+  } else {
+    router.push({ name: 'catalog', query: peekCatalogReturnQuery() })
+  }
+}
 async function syncApi(dir: 'local2db' | 'db2local') {
   try { await postJson(`/sync/${dir}`) } catch { /* ignore */ }
 }
@@ -173,6 +186,39 @@ onUnmounted(() => {
 .jmz-header-center {
   flex: 1;
   min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.jmz-header-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(46, 46, 53, 0.4);
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.jmz-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9b9bb4;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.jmz-tab:hover {
+  color: #c4c4d6;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.jmz-tab--active {
+  color: #e0e0e6;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .jmz-header-right {

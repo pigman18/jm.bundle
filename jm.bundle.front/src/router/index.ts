@@ -5,6 +5,7 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', name: 'catalog', component: CatalogPage },
+    { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue') },
     {
       path: '/detail/:num',
       name: 'detail',
@@ -20,6 +21,7 @@ export const router = createRouter({
 
 router.afterEach((to) => {
   if (to.name === 'catalog') document.title = 'JM 目录'
+  else if (to.name === 'search') document.title = 'JM 搜索'
   else if (to.name === 'detail') document.title = `JM #${to.params.num}`
   else document.title = 'JM'
 })

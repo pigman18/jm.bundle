@@ -52,6 +52,16 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
     serverOrigin = `http://${listenHost}:${port}`;
     let homeUrl = `${serverOrigin}${hp.startsWith('/') ? hp : `/${hp}`}`;
 
+    function fmtDate(ts) {
+        const n = Number(ts);
+        if (!Number.isFinite(n)) return String(ts || '');
+        const d = new Date(n * 1000);
+        const Y = d.getFullYear();
+        const M = String(d.getMonth() + 1).padStart(2, '0');
+        const D = String(d.getDate()).padStart(2, '0');
+        return `${Y}-${M}-${D}`;
+    }
+
     function handleJmConfig(app, api) {
         app.post(`${api}/jm-config`, (req, res) => {
             try {
@@ -466,6 +476,42 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         });
     }
 
+    function handleComicSearch(app, api) {
+        app.get(`${api}/search/comics`, async (req, res) => {
+            try {
+                const keyword = String(req.query.keyword || '').trim();
+                if (!keyword) {
+                    res.json({ok: false, message: '请输入搜索关键词'});
+                    return;
+                }
+                const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+                const sort = String(req.query.sort || '');
+                const result = await crawler.search.byKeyword(keyword, page, sort);
+                const list = (result.content || []).map((item) => {
+                    const cat = item.category || {};
+                    const sub = item.category_sub || {};
+                    const o = {
+                        id: Number(item.id),
+                        name: String(item.name || ''),
+                        cover: String(item.image || ''),
+                        author: Array.isArray(item.author) ? item.author : (item.author ? [String(item.author)] : []),
+                        tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+                        description: String(item.description || ''),
+                        total_views: String(item.total_views ?? ''),
+                        likes: String(item.likes ?? ''),
+                        kind: String(cat.title || sub.title || ''),
+                        displayKindLabel: String(sub.title || cat.title || ''),
+                        updateDate: item.update_at ? fmtDate(item.update_at) : '',
+                    };
+                    return rewriteComicMediaUrls(o);
+                });
+                res.json({ok: true, list, total: result.total || 0, pages: result.pages || 1});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
     function handleDownload(app, api) {
         app.post(`${api}/comics/:num/download`, async (req, res) => {
             try {
@@ -655,6 +701,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         handleComicsList(app, api);
         handleFetchMeta(app, api);
         handleComicDetail(app, api);
+        handleComicSearch(app, api);
         handleDownload(app, api);
         handleBatchAdd(app, api);
         handleZipFile(app, api);

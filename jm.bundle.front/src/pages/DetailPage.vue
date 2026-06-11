@@ -207,7 +207,13 @@ async function onRead(row: ZipRow) {
   await openComic(n, row.zipKey, `${comic.value?.name || ''} · ${row.zipLabel}`)
 }
 
-function backToCatalog() { router.push({ name: 'catalog', query: peekCatalogReturnQuery() }) }
+function backToCatalog() {
+  if (route.query.from === 'search') {
+    router.push({ name: 'search' })
+  } else {
+    router.push({ name: 'catalog', query: peekCatalogReturnQuery() })
+  }
+}
 
 function fmtTime(ts: string | undefined): string {
   if (!ts) return ''
@@ -335,7 +341,7 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
       <template v-else-if="!loading">
         <div class="jmz-detail-empty">
           <n-empty description="未找到该漫画" />
-          <n-button class="jmz-back-only" @click="backToCatalog">返回目录</n-button>
+          <n-button class="jmz-back-only" @click="backToCatalog">返回</n-button>
         </div>
       </template>
     </n-spin>

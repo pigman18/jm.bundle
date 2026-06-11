@@ -1160,7 +1160,7 @@ function createCrawler(manifest, ctx, message, config) {
          * @param keyword                   关键字
          * @param page                      第几页
          * @param sort {SearchSort}         排序
-         * @return {Promise<Object>}
+         * @return {Promise<{content: JmSearchMeta}>}
          */
         byKeyword: async (keyword, page = 1, sort= SearchSort.Latest) => {
             // 1、请求到内容
