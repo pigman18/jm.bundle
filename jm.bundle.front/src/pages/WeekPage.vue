@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, reactive, watch, onActivated } from 'vue'
+import { ref, shallowRef, reactive, watch, onActivated, inject, type Ref } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { getJson, postJson } from '@/api'
@@ -27,6 +27,9 @@ const activeCategory = ref('')
 const activeType = ref('')
 const list = shallowRef<Comic[]>([])
 const total = ref(0)
+
+const currentPageComics = inject<Ref<Comic[]>>('currentPageComics')!
+watch(list, (v) => { currentPageComics.value = v }, { immediate: true })
 
 const cachedList = shallowRef<Comic[]>([])
 const cachedTotal = ref(0)

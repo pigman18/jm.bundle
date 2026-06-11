@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, shallowRef, computed, onMounted, watch, onActivated } from 'vue'
+import { reactive, ref, shallowRef, computed, onMounted, watch, onActivated, inject, type Ref } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useMessage, type MessageApi } from 'naive-ui'
@@ -24,6 +24,9 @@ const loading = ref(false)
 const list = shallowRef<Comic[]>([])
 const total = ref(0)
 const coverLoaded = reactive<Record<number, boolean>>({})
+
+const currentPageComics = inject<Ref<Comic[]>>('currentPageComics')!
+watch(list, (v) => { currentPageComics.value = v }, { immediate: true })
 
 const cachedList = shallowRef<Comic[]>([])
 const cachedTotal = ref(0)
@@ -135,6 +138,8 @@ onActivated(() => {
   if (cachedList.value.length > 0) {
     list.value = cachedList.value
     total.value = cachedTotal.value
+    cachedQueryKey = JSON.stringify(filtersToQuery() || {})
+    router.replace({ name: 'catalog', query: filtersToQuery() })
     setTimeout(() => window.scrollTo(0, scrollTop.value), 0)
   }
 })

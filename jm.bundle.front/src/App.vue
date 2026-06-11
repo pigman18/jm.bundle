@@ -40,7 +40,11 @@
                   </span>
                 </div>
               </template>
-              <n-button text size="small" class="jmz-header-task-btn" @click="openTasks">
+              <n-button text size="small" class="jmz-header-btn" @click="showBatchDownload = true" v-if="!isDetail && currentPageComics.length > 0">
+                <template #icon><n-icon :component="DownloadOutline" /></template>
+                <span>下载全部</span>
+              </n-button>
+              <n-button text size="small" class="jmz-header-btn" @click="openTasks">
                 <template #icon><n-icon :component="ListOutline" /></template>
                 <span>任务</span>
                 <span v-if="live.queueCount > 0" class="jmz-task-badge">{{ live.queueCount }}</span>
@@ -56,6 +60,7 @@
           </router-view>
         </main>
         <TasksDialog v-model:show="showTasks" />
+        <BatchDownloadDialog v-model:show="showBatchDownload" :comics="currentPageComics" />
       </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -65,13 +70,15 @@
 <script setup lang="ts">
 import { ref, computed, provide, onMounted, onUnmounted } from 'vue'
 import { zhCN, dateZhCN, darkTheme } from 'naive-ui'
-import { ArrowBack, CloudUploadOutline, CloudDownloadOutline, ListOutline } from '@vicons/ionicons5'
+import { ArrowBack, CloudUploadOutline, CloudDownloadOutline, ListOutline, DownloadOutline } from '@vicons/ionicons5'
 import { useRoute, useRouter } from 'vue-router'
 import { useJmLiveStore } from '@/stores/jmLive'
 import { useJmTasksStore } from '@/stores/jmTasks'
 import { API } from '@/constants'
 import { postJson } from '@/api'
+import type { Comic } from '@/types'
 import TasksDialog from '@/components/TasksDialog.vue'
+import BatchDownloadDialog from '@/components/BatchDownloadDialog.vue'
 import { peekCatalogReturnQuery } from '@/utils/catalogReturn'
 
 const route = useRoute()
@@ -83,6 +90,10 @@ const showTasks = ref(false)
 const isDetail = computed(() => route.name === 'detail')
 provide('jmzOpenTasks', () => { showTasks.value = true })
 provide('sendWs', (msg: string) => { try { ws?.send(msg) } catch {} })
+
+const currentPageComics = ref<Comic[]>([])
+provide('currentPageComics', currentPageComics)
+const showBatchDownload = ref(false)
 
 function openTasks() { showTasks.value = true }
 function backToCatalog() {
@@ -232,8 +243,24 @@ onUnmounted(() => {
 .jmz-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
+}
+.jmz-header-right > :not(:last-child)::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: #2e2e35;
+  margin-left: 4px;
+}
+.jmz-header-btn {
+  color: #9b9bb4 !important;
+  padding: 0 6px !important;
+  font-size: 12px !important;
+}
+.jmz-header-btn:hover {
+  color: #e0e0e6 !important;
 }
 
 .jmz-header-sync-group {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, reactive, onActivated, watch } from 'vue'
+import { ref, shallowRef, reactive, onActivated, watch, inject, type Ref } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { SearchOutline } from '@vicons/ionicons5'
@@ -16,6 +16,9 @@ const loading = ref(false)
 const fetching = ref<Record<number, boolean>>({})
 const list = shallowRef<Comic[]>([])
 const total = ref(0)
+
+const currentPageComics = inject<Ref<Comic[]>>('currentPageComics')!
+watch(list, (v) => { currentPageComics.value = v }, { immediate: true })
 const pages = ref(0)
 const currentPage = ref(1)
 
