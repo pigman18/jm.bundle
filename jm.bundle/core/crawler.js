@@ -13,7 +13,7 @@ const lock = new AsyncLock();
 
 const {ApiPath, SearchSort, PHASE, STATE, STEP, ERR} = require('../protocol');
 const {retryAndCatch, zipText, unZipText} = require('../../util/common');
-const {safeClose} = require('../../util/cloudflare');
+const {connectByPuppeteerRealBrowser, getJmCloudflareCookie, safeClose} = require('../../util/cloudflare');
 const {mergeCookie} = require('../../util/cookie');
 const {url2DataPath, saveAxiosResponse, getResponseStream, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData} = require('../../util/http');
 const {touchFileSync, writeToFileSync, isNotEmptySync, renameSync} = require('../../util/file');
@@ -257,156 +257,6 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     /**
-     * 获取cloudflare的cookie
-     * @param url               指定站点
-     * @param proxy             代理地址
-     * @param onProgress        进度
-     * @return {Promise<{cookie: string, userAgent: string}>}
-     */
-    async function getJmCloudflareCookie(url,
-                                         onProgress,
-    ) {
-        let {
-            proxy,
-            headless,
-            chromePath
-        } = config;
-        // 1、拼接配置信息
-        let width = 420, height = 560;
-        let options = {
-            headless: headless || false,
-            fingerprint: true, // 注入随机浏览器指纹
-            proxy: proxy,
-            turnstile: true,
-            disableXvfb: false,
-            ignoreAllFlags: true,
-            args: [
-                // '--no-sandbox',
-                // '--incognito',   // 无痕模式,
-                `--window-size=${width},${height}`,
-                '--lang=zh-CN',
-                '--enable-features=UserAgentClientHint',
-                // '--auto-open-devtools-for-tabs', // 打开开发者工具的控制台
-                // 禁用“保存密码”气泡/弹窗
-                "--disable-save-password-bubble",
-                // 通过 feature 关闭密码管理器相关功能（较新 Chrome 更有效）
-                "--disable-features=PasswordManager,PasswordLeakDetection",
-                // 禁用“登录 Chrome / 同步”类的促销与询问
-                "--disable-signin-promo",
-                "--disable-sync",
-                '--disable-gpu',
-                '--disable-software-rasterizer',
-                '--disable-dev-shm-usage',
-                '--disable-extensions',
-                '--disable-background-networking',
-                '--disable-blink-features=AutomationControlled',
-
-                // '--disable-extensions',
-                '--disable-infobars',
-                '--disable-bookmark-bar',
-                '--window-position=center',
-                '--app=about:blank',        // ✅ 去掉地址栏（Chromium app mode）
-            ],
-            defaultViewport: {
-                width: width,
-                height: height,
-            },
-            customConfig:{
-
-            }
-        };
-        if (!!chromePath && isNotEmptySync(chromePath)) {
-            options.customConfig.chromePath = chromePath;
-        }
-        if (!!proxy) {
-            options.args.push(
-                `--proxy-server=${proxy}`
-            );
-        }
-        // 2、记录cookie（需要多次拼接）
-        let cookie = '';
-        // 2、打开页面
-        const {browser, page} = await connect(options);
-        await page.goto(url, {
-            waitUntil: 'domcontentloaded'
-        });
-        await page.setViewport({
-            width: width,
-            height: height
-        });
-        // 方法B：页面请求时拦截加上头
-        // 3、注册响应查看，方便排查
-        let userAgent, cookies, extraHeaders = {}, complete = 0;
-        page.on('response', async (resp) => {
-            let req = resp.request();
-            let method = req.method();
-            let url = resp.url();
-            let reqHeaders = req.headers() || {};
-            let respHeaders = resp.headers() || {};
-            let reqCookie = reqHeaders['cookie'];
-            let respCookie = respHeaders['set-cookie'];
-            // 4、累加请求到的cookie
-            if (!!reqCookie || !!respCookie) {
-                cookie = mergeCookie(cookie, reqCookie);
-                cookie = mergeCookie(cookie, respCookie);
-            }
-            for(let key in reqHeaders) {
-                if (reqHeaders.hasOwnProperty(key)) {
-                    if (key.startsWith('sec-')) {
-                        extraHeaders[key] = reqHeaders[key];
-                    }
-                }
-            }
-            // console.log(`[${method}]${url}`);
-            // 判断是否502
-            try {
-                let title = await page.evaluate(async () => {
-                    return (document.title || '');
-                });
-                if (title.includes('502') && title.includes('Bad gateway')) {
-                    await page.reload();
-                }
-            } catch (e) {
-
-            }
-            try {
-                const body = (await resp.text()) || '';
-                if (body.includes('禁漫天堂') || body.includes('个人资料')) {
-                    // 8、获取 cookie、userAgent
-                    userAgent = await browser.userAgent();
-                    let cookies1 = await browser.cookies();
-                    let cookies2 = await page.cookies();
-                    cookies = [
-                        ...(cookies1 || []),
-                        ...(cookies2 || [])
-                    ];
-                    // 9、关闭页面
-                    await safeClose(page, {});
-                }
-            } catch (e) {
-
-            } finally {
-                complete += 1;
-                onProgress?.(complete, 100);
-            }
-        });
-        await page.waitForFunction(
-            () => false,
-            { timeout: 0 }
-        ).catch(() => {});
-        cookie = mergeCookie(cookie, (cookies || []).map((c) => {
-            return c.name + "=" + c.value;
-        }).join(';'));
-        onProgress?.(100, 100);
-        console.log('\n')
-        return {
-            userAgent,
-            cookie,
-            extraHeaders
-        };
-    }
-
-    /**
      * 进行 JM 网页登录（有锁）
      * 1、通过 cloudflare 校验，获取 cf_clearance、ipcountry、ipm5、theme=light、AVS、sticky 这些 cookie 头
      * 2、GET 访问/albums/meiman 页面，会返回 set-cookie，ipcountry、ipm5
@@ -456,13 +306,14 @@ function createCrawler(manifest, ctx, message, config) {
                         if (is403Flag) {
                             // 2、请求 Cloudflare 的 cookie
                             let {
-                                userAgent,
+                                browser,
+                                page
+                            } = await connectByPuppeteerRealBrowser(config.proxy);
+                            let {
                                 cookie,
+                                userAgent,
                                 extraHeaders
-                            } = await getJmCloudflareCookie(
-                                PAGE_LOGIN,
-                                onProgress
-                            );
+                            } = await getJmCloudflareCookie(browser, page, PAGE_LOGIN, onProgress);
                             // 3、追加（覆盖）到当前 cookie 中
                             setUserAgent(userAgent);
                             setCookie(mergeCookie(config.cookie, cookie));
