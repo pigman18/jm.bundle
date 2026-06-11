@@ -293,7 +293,7 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
           <section class="jmz-panel jmz-panel--pad">
             <div class="jmz-zip-head">
               <h2 class="jmz-block-title">ZIP / 阅读</h2>
-              <n-checkbox v-model:checked="withMeta" size="small" class="jmz-zip-meta">附带作品信息</n-checkbox>
+              <n-checkbox v-model:checked="withMeta" class="jmz-zip-meta">附带作品信息</n-checkbox>
               <n-button v-if="showDownloadAll" type="primary" @click="downloadAllMissing" class="jmz-zip-dlall">全部下载</n-button>
             </div>
             <div v-if="zipRows.length" class="jmz-zip-table">
@@ -306,16 +306,16 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
                 <div class="jmz-zip-cell jmz-zip-cell--title" :title="row.epTitle">{{ row.epTitle }}</div>
                 <div class="jmz-zip-cell jmz-zip-cell--action">
                   <template v-if="dlUi(row).kind === 'ready'">
-                    <n-button type="success" size="small" @click="onRead(row)">阅读</n-button>
+                    <n-button type="success" @click="onRead(row)">阅读</n-button>
                   </template>
                   <template v-else-if="dlUi(row).kind === 'idle'">
-                    <n-button type="primary" size="small" @click="postDownload(row.zipKey, row.label)">下载</n-button>
+                    <n-button type="primary" @click="postDownload(row.zipKey, row.label)">下载</n-button>
                   </template>
                   <template v-else-if="dlUi(row).kind === 'queued'">
                     <n-tag type="info">{{ (dlUi(row) as any).label || '排队中' }}</n-tag>
                   </template>
                   <template v-else-if="dlUi(row).kind === 'connect'">
-                    <n-button type="warning" size="small" disabled>{{ (dlUi(row) as any).stepText || '进行中' }}</n-button>
+                    <n-button type="warning" disabled>{{ (dlUi(row) as any).stepText || '进行中' }}</n-button>
                   </template>
                   <template v-else-if="dlUi(row).kind === 'pct'">
                     <div class="jmz-dl-pct">
@@ -328,7 +328,7 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
                   <template v-else-if="dlUi(row).kind === 'error'">
                     <div class="jmz-dl-err">
                       <span>{{ (dlUi(row) as any).msg }}</span>
-                      <n-button type="error" size="small" quaternary @click="postDownload(row.zipKey, row.label)">重试</n-button>
+                      <n-button type="error" quaternary @click="postDownload(row.zipKey, row.label)">重试</n-button>
                     </div>
                   </template>
                 </div>

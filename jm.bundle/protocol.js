@@ -417,6 +417,129 @@ class JmWeekInfo {
     }
 }
 
+/**
+ * 子分類
+ */
+class JmSubCategory {
+    /**
+     * 子分類ID
+     * @type {string}
+     */
+    CID;
+
+    /**
+     * 子分類名稱
+     * @type {string}
+     */
+    name;
+
+    /**
+     * 子分類 slug
+     * @type {string}
+     */
+    slug;
+
+    constructor(CID, name, slug) {
+        this.CID = CID;
+        this.name = name;
+        this.slug = slug;
+    }
+}
+
+/**
+ * 分類項
+ */
+class JmCategoryItem {
+    /**
+     * 分類ID
+     * @type {string|number}
+     */
+    id;
+
+    /**
+     * 分類名稱
+     * @type {string}
+     */
+    name;
+
+    /**
+     * 分類 slug
+     * @type {string}
+     */
+    slug;
+
+    /**
+     * 分類類型（slug / search）
+     * @type {string}
+     */
+    type;
+
+    /**
+     * 作品總數
+     * @type {string|number}
+     */
+    total_albums;
+
+    /**
+     * 子分類列表
+     * @type {JmSubCategory[]}
+     */
+    sub_categories;
+
+    constructor(id, name, slug, type, total_albums, sub_categories) {
+        this.id = id;
+        this.name = name;
+        this.slug = slug;
+        this.type = type;
+        this.total_albums = total_albums;
+        this.sub_categories = sub_categories;
+    }
+}
+
+/**
+ * 標籤區塊
+ */
+class JmBlockItem {
+    /**
+     * 區塊標題
+     * @type {string}
+     */
+    title;
+
+    /**
+     * 標籤內容列表
+     * @type {string[]}
+     */
+    content;
+
+    constructor(title, content) {
+        this.title = title;
+        this.content = content;
+    }
+}
+
+/**
+ * 分類索引資訊
+ */
+class JmCategoryInfo {
+    /**
+     * 分類列表
+     * @type {JmCategoryItem[]}
+     */
+    categories;
+
+    /**
+     * 標籤區塊列表
+     * @type {JmBlockItem[]}
+     */
+    blocks;
+
+    constructor(categories, blocks) {
+        this.categories = categories;
+        this.blocks = blocks;
+    }
+}
+
 module.exports = {
     PHASE,
     STEP,
@@ -428,5 +551,9 @@ module.exports = {
     SearchSort,
     JmWeekCategory,
     JmWeekType,
-    JmWeekInfo
+    JmWeekInfo,
+    JmCategoryItem,
+    JmSubCategory,
+    JmBlockItem,
+    JmCategoryInfo
 };

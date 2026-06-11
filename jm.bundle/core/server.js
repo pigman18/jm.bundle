@@ -567,6 +567,53 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         });
     }
 
+    function handleCategoryInfo(app, api) {
+        app.get(`${api}/category/info`, async (req, res) => {
+            try {
+                const info = await crawler.rank.categories();
+                res.json({ok: true, categories: info?.categories || [], blocks: info?.blocks || []});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
+    function handleCategoryFilter(app, api) {
+        app.get(`${api}/category/filter`, async (req, res) => {
+            try {
+                const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+                const time = String(req.query.time || 'a').slice(0, 1) || 'a';
+                const slug = String(req.query.slug || '');
+                const sort = String(req.query.sort || 'mv');
+                const result = await crawler.rank.categoriesFilter(page, time, slug, sort);
+                const comicDir = path.join(config.dataDir, 'comic');
+                const list = (result?.content || []).map((item) => {
+                    const id = Number(item.id);
+                    const o = {
+                        id,
+                        name: String(item.name || ''),
+                        cover: String(item.image || ''),
+                        author: Array.isArray(item.author) ? item.author : (item.author ? [String(item.author)] : []),
+                        tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+                        total_views: String(item.total_views ?? ''),
+                        likes: String(item.likes ?? ''),
+                        inStore: false,
+                        canRead: false,
+                    };
+                    return rewriteComicMediaUrls(o);
+                });
+                await Promise.all(list.map(async (o) => {
+                    const dbRow = await store.comicMeta.get(o.id);
+                    o.inStore = !!dbRow;
+                    o.canRead = isNotEmptySync(path.join(comicDir, `${o.id}.zip`));
+                }));
+                res.json({ok: true, list, total: result?.total || list.length, pages: result?.pages || 1});
+            } catch (e) {
+                res.status(500).json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
     function handleDownload(app, api) {
         app.post(`${api}/comics/:num/download`, async (req, res) => {
             try {
@@ -759,6 +806,8 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         handleComicSearch(app, api);
         handleWeekInfo(app, api);
         handleWeekComics(app, api);
+        handleCategoryInfo(app, api);
+        handleCategoryFilter(app, api);
         handleDownload(app, api);
         handleBatchAdd(app, api);
         handleZipFile(app, api);

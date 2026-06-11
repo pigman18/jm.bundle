@@ -40,7 +40,7 @@
             <n-form-item label="JM 编码" required>
               <n-input v-model:value="addNumber" placeholder="输入 JM 编码" :disabled="addLoading" @keyup.enter="fetchInfo" />
             </n-form-item>
-            <n-button size="small" @click="fetchInfo" :loading="addLoading" :disabled="!addNumber.trim()">查询</n-button>
+            <n-button @click="fetchInfo" :loading="addLoading" :disabled="!addNumber.trim()">查询</n-button>
             <template v-if="fetchedInfo">
               <div class="jmt-add-preview">
                 <img v-if="fetchedInfo.cover" class="jmt-add-cover" :src="fetchedInfo.cover" alt="" />
@@ -56,7 +56,7 @@
               </div>
               <div v-if="fetchedInfo.series.length > 1" class="jmt-ep-list">
                 <div class="jmt-ep-head">
-                  <n-checkbox v-model:checked="allChecked" :indeterminate="epSomeChecked" size="small" />全选
+                  <n-checkbox v-model:checked="allChecked" :indeterminate="epSomeChecked" />全选
                 </div>
                 <div v-for="ep in fetchedInfo.series" :key="ep.id" class="jmt-ep-row">
                   <n-checkbox v-model:checked="epChecked[ep.id]" />
@@ -66,7 +66,7 @@
                   <span v-if="ep.done" style="margin-left:auto;flex-shrink:0;display:flex"><n-tag type="success" size="small">已完成</n-tag></span>
                 </div>
               </div>
-              <n-checkbox v-model:checked="withMeta" size="small" style="margin-top:10px">附带作品信息</n-checkbox>
+              <n-checkbox v-model:checked="withMeta" style="margin-top:10px">附带作品信息</n-checkbox>
             </template>
           </template>
 
@@ -75,11 +75,11 @@
               <n-input v-model:value="batchText" type="textarea" placeholder="501488&#10;五：玩10把街霸6，25分钟吃了77个指令投&#10;501489&#10;501490" :rows="6" />
             </n-form-item>
             <n-space>
-              <n-button size="small" @click="pickFile">选择文件</n-button>
+              <n-button @click="pickFile">选择文件</n-button>
               <input ref="fileInput" type="file" accept=".txt,text/plain" style="display:none" @change="onFilePicked" />
               <span v-if="batchCount" class="jmt-batch-count">共解析到 {{ batchCount }} 个 JM 编码</span>
             </n-space>
-            <n-checkbox v-model:checked="withMetaBatch" size="small" style="margin-top:10px">附带作品信息</n-checkbox>
+            <n-checkbox v-model:checked="withMetaBatch" style="margin-top:10px">附带作品信息</n-checkbox>
           </template>
         </n-form>
       </template>

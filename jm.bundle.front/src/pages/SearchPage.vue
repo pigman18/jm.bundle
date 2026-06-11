@@ -22,6 +22,7 @@ const currentPage = ref(1)
 const cachedList = shallowRef<Comic[]>([])
 const cachedTotal = ref(0)
 const cachedPages = ref(0)
+const lastKw = ref('')
 const scrollTop = ref(0)
 
 let _syncingUrl = false
@@ -33,7 +34,13 @@ watch(() => route.query, (q) => {
   keyword.value = kw
   sort.value = String(q.sort || 'mr')
   currentPage.value = Math.max(1, parseInt(String(q.page || '1'), 10) || 1)
-  if (!cachedList.value.length) doSearch(currentPage.value)
+  // 关键字不同时忽略缓存，重新搜索
+  if (kw !== lastKw.value) {
+    cachedList.value = []
+    doSearch(currentPage.value)
+  } else if (!cachedList.value.length) {
+    doSearch(currentPage.value)
+  }
 }, { immediate: true })
 
 // 离开前保存滚动位置和列表
@@ -69,6 +76,7 @@ const sortOptions = [
 async function doSearch(page?: number) {
   const kw = keyword.value.trim()
   if (!kw) return
+  lastKw.value = kw
   const p = page ?? currentPage.value
   currentPage.value = p
   // 写 URL 便于恢复

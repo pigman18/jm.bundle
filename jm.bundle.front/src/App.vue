@@ -20,6 +20,7 @@
                   <router-link :to="{ name: 'catalog' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'catalog' }">本地管理</router-link>
                   <router-link :to="{ name: 'search' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'search' }">漫画搜索</router-link>
                   <router-link :to="{ name: 'week' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'week' }">每周必看</router-link>
+                  <router-link :to="{ name: 'category' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'category' }">分类排行</router-link>
                 </div>
               </template>
             </div>
@@ -49,7 +50,7 @@
         </header>
         <main class="jmz-app-main">
           <router-view v-slot="{ Component }">
-            <keep-alive :include="['CatalogPage', 'SearchPage', 'WeekPage']">
+            <keep-alive :include="['CatalogPage', 'SearchPage', 'WeekPage', 'CategoryPage']">
               <component :is="Component" />
             </keep-alive>
           </router-view>
@@ -89,6 +90,8 @@ function backToCatalog() {
     router.push({ name: 'search' })
   } else if (route.query.from === 'week') {
     router.push({ name: 'week' })
+  } else if (route.query.from === 'category') {
+    router.push({ name: 'category' })
   } else {
     router.push({ name: 'catalog', query: peekCatalogReturnQuery() })
   }

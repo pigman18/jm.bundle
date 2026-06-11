@@ -1245,7 +1245,7 @@ function createCrawler(manifest, ctx, message, config) {
                 return await reqApi(`${ApiPath.getCategoriesFilter}?${toQueryString({
                     'page': page,
                     'order': '',  // 该参数为空
-                    'c': category,
+                    'c': category || '0',
                     'o': o
                 })}`);
             });

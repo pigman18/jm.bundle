@@ -7,6 +7,7 @@ export const router = createRouter({
     { path: '/', name: 'catalog', component: CatalogPage },
     { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue') },
     { path: '/week', name: 'week', component: () => import('@/pages/WeekPage.vue') },
+    { path: '/category', name: 'category', component: () => import('@/pages/CategoryPage.vue') },
     {
       path: '/detail/:num',
       name: 'detail',
@@ -24,6 +25,7 @@ router.afterEach((to) => {
   if (to.name === 'catalog') document.title = 'JM 目录'
   else if (to.name === 'search') document.title = 'JM 搜索'
   else if (to.name === 'week') document.title = 'JM 每周必看'
+  else if (to.name === 'category') document.title = 'JM 分类排行'
   else if (to.name === 'detail') document.title = `JM #${to.params.num}`
   else document.title = 'JM'
 })
