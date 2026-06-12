@@ -74,15 +74,10 @@ let ERR = {
 let ApiPath = {
     Login: "/login",
     GetUserProfile: "/login",
-    Search: "/search",
     GetMeta: "/album",
     GetChapter:  "/chapter",
     GetScrambleId: "/chapter_view_template",
-    GetFavoriteFolder: "/favorite",
-    GetWeeklyInfo:  "/week",
-    GetWeekly: "/week/filter",
-    GetCategories: '/categories',
-    getCategoriesFilter: '/categories/filter'
+    GetFavoriteFolder: "/favorite"
 };
 
 /**

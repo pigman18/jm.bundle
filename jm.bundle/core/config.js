@@ -24,7 +24,9 @@ let defaultConfig = {
         "https://www.cdngwc.net",
         "https://www.cdngwc.club"
     ],
-    "headless": false
+    "headless": false,
+    "token": "",
+    "cookie": ""
 };
 
 /**

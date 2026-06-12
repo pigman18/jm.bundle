@@ -7,20 +7,17 @@ const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const JSZip = require('jszip');
-const {connect} = require('puppeteer-real-browser');
 const AsyncLock = require('async-lock');
 const lock = new AsyncLock();
 
 const {ApiPath, SearchSort, PHASE, STATE, STEP, ERR} = require('../protocol');
-const {retryAndCatch, zipText, unZipText} = require('../../util/common');
-const {connectByPuppeteerRealBrowser, getJmCloudflareCookie, safeClose} = require('../../util/cloudflare');
-const {mergeCookie} = require('../../util/cookie');
+const {retryAndCatch} = require('../../util/common');
 const {url2DataPath, saveAxiosResponse, getResponseStream, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData} = require('../../util/http');
 const {touchFileSync, writeToFileSync, isNotEmptySync, renameSync} = require('../../util/file');
-const {buffer2Base64Image} = require('../../util/image');
-const {calcMathCaptcha} = require('../../util/captcha');
 const {parseComicRankingPage, parseSerializationList, parseWeekList, parseComicWeekList, parseMeta, parseNumber} = require('./parser');
 const {decideHeadersAndTs, tokenAndTokenparam, decodeRespData} = require('./mobile');
+
+const UserAgents = require('../resources/userAgents');
 
 // ================= JM 客户端 =================
 /**
@@ -32,37 +29,74 @@ const {decideHeadersAndTs, tokenAndTokenparam, decodeRespData} = require('./mobi
  * @return {object}
  */
 function createCrawler(manifest, ctx, message, config) {
-    // 0、验证码错误
-    // 1、获取爬虫相关域名
+    // 1、userAgent
+    const keys = Object.keys(UserAgents);
+    const userAgent = UserAgents[keys[Math.floor(Math.random() * keys.length)]];
+    // 3、获取爬虫相关域名
     let {
         host,
         cdnHosts,
         apiHosts,
         dataDir
     } = config;
-    cdnHosts = cdnHosts || [
-        "https://cdn-msp.18comic.vip",
-        "https://cdn-msp2.18comic.vip",
-        "https://cdn-msp3.18comic.vip"
-    ];
-    apiHosts = apiHosts || [
-        "https://www.cdnhjk.net",
-        "https://www.cdngwc.cc",
-        "https://www.cdngwc.net",
-        "https://www.cdngwc.club"
-    ];
-    let requestExtraHeaders = {
-        'sec-ch-ua-arch': '"x86"'
-    };
-    let expiresTime = -1;
     // 2、设置 info目录、album_missing目录、episodes目录
     let infoDir = path.join(dataDir, 'info'),                    // 存放漫画基本信息
-        infoHtmlDir = path.join(dataDir, 'html'),                // 存放漫画基本信息原始网页（压缩文本）
         comicDir = path.join(dataDir, 'comic'),                  // 存放漫画内容
-        fileDir = path.join(dataDir, 'file'),                    // 存放其他数据
-        albumMissingDir = path.join(dataDir, 'album_missing');   // 存放无效编码（txt）
+        fileDir = path.join(dataDir, 'file');                    // 存放其他数据
     // 3、创建http请求客户端
+    let apiClient = createApiClient();
     let httpClient = createHttpClient();
+
+    /**
+     * 创建 http 请求客户端
+     */
+    function createApiClient() {
+        // 1、创建 http 请求客户端
+        let agent = null;
+        let proxy = config.proxy || '';
+        if (proxy.startsWith('socks5://')) {
+            agent = new SocksProxyAgent(proxy);
+        } else if (proxy.startsWith('http://')) {
+            agent = new HttpsProxyAgent(proxy);
+        }
+        let apiClient = axios.create({
+            httpAgent: agent,
+            httpsAgent: agent,
+            proxy: false      // 关键：禁用 axios 自带的代理检测
+        });
+        // 2、设置请求拦截
+        apiClient.interceptors.request.use((cfg) => {
+            cfg.adapter = 'http'; // ✅ 明确只走 Node
+            // 3、实时获取配置中的 userAgent、cookie
+            cfg.timeout = config.timeout || 5000;
+            cfg.headers['user-agent'] = userAgent;
+            cfg.headers['cookie'] = config.cookie;
+            cfg.headers['accept'] = 'text/html,application/json,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7';
+            //  4、统一加签、解码
+            const { ts, headers } = decideHeadersAndTs(cfg.url);
+            cfg.headers = {
+                ...cfg.headers,
+                ...headers
+            };
+            cfg.__jm_ts = ts;
+            return cfg;
+        });
+        apiClient.interceptors.response.use((resp) => {
+            const ts = resp.config.__jm_ts;
+            if (!!resp.config?.ignoredDecode) return resp;
+            try {
+                const raw = resp?.data?.data || '';
+                // 1、解码数据
+                if (!!raw && !((Array.isArray(raw) && raw.length === 0))) {
+                    resp.data.data = decodeRespData(raw, ts);
+                }
+            } catch (e) {
+                console.warn('JM decode failed', e);
+            }
+            return resp;
+        });
+        return apiClient;
+    }
 
     /**
      * 创建 http 请求客户端
@@ -86,148 +120,116 @@ function createCrawler(manifest, ctx, message, config) {
             cfg.adapter = 'http'; // ✅ 明确只走 Node
             // 3、实时获取配置中的 userAgent、cookie
             cfg.timeout = config.timeout || 5000;
-            cfg.headers['user-agent'] = config.userAgent;
+            cfg.headers['user-agent'] = userAgent;
             cfg.headers['cookie'] = config.cookie;
             cfg.headers['accept'] = 'text/html,application/json,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7';
-            // 添加额外请求头
-            for (let key in requestExtraHeaders) {
-                if (requestExtraHeaders.hasOwnProperty(key)) {
-                    cfg.headers[key] = requestExtraHeaders[key];
-                }
-            }
             return cfg;
         });
-        // 4、拦截请求进行处理
-        httpClient.interceptors.response.use(
-            (response) => {
-                // 5、请求成功，模拟浏览器追加 cookie
-                if (200 === response.status) {
-                    let resCookies = response.headers['set-cookie'] || [];
-                    // 响应头的过期时间必须比现在大才能追加
-                    for (let resCookie of resCookies) {
-                        if (!!resCookie) {
-                            let flag1 = resCookie.includes('remember');
-                            let flag2 = resCookie.includes(config.username);
-                            let flag = !flag1 || (flag1 && flag2);
-                            if (flag) {
-                                // console.log(`追加 cookie：${resCookie}`);
-                                setCookie(mergeCookie(config.cookie, resCookie));
-                            }
-                        }
-                    }
-                }
-                return response;
-            },
-            (error) => {
-                // ❌ 请求失败
-                return Promise.reject(error);
-            }
-        );
-        httpClient.get = withRetry(httpClient.get, 3);
-        httpClient.post = withRetry(httpClient.post, 3);
         return httpClient;
     }
 
     /**
-     * 设置额外请求头
-     * @param extraHeaders
+     * 获取apiHost
+     * @return {*}
      */
-    function setExtraHeaders(extraHeaders) {
-        extraHeaders = extraHeaders || {};
-        for (let key in extraHeaders) {
-            if (extraHeaders.hasOwnProperty(key)) {
-                requestExtraHeaders[key] = extraHeaders[key];
+    function getApiHost() {
+        return apiHosts[Math.floor(Math.random() * apiHosts.length)];
+    }
+
+    /**
+     * 进行 JM 网页登录（有锁）
+     * 1、通过 cloudflare 校验，获取 cf_clearance、ipcountry、ipm5、theme=light、AVS、sticky 这些 cookie 头
+     * 2、GET 访问/albums/meiman 页面，会返回 set-cookie，ipcountry、ipm5
+     * 3、POST 请求/login 接口，继续追加 cookie
+     * 4、再次跳转会/albums/meiman 页面
+     * @return {Promise<{cookie, userAgent, username}|*>}
+     */
+    async function login(phase = PHASE.LOGIN, phaseData = {}) {
+        phase = phase || PHASE.LOGIN;
+        phaseData = phaseData || {};
+        // 1、定义使用到的页面、api
+        let API_LOGIN = `${getApiHost()}/login`;
+        return await message.doLockPhase(phase, async (stepHandler) => {
+            // 2、定义步骤过程
+            let steps = {
+                // 2.1、检查当前用户名密码是否有填写
+                [STEP.CHECK_LOGIN_PARAMS]: async () => {
+                    return await stepHandler.doStep(STEP.CHECK_LOGIN_PARAMS, async () => {
+                        return new Promise((resolve, reject) => {
+                            // 1、定时验证用户名密码是否有填写，否则则不会进入登录流程
+                            const check = () => {
+                                if (config.username && config.password) {
+                                    resolve();
+                                } else {
+                                    // 通知前端
+                                    message?.onMessage({
+                                        phase: PHASE.LOGIN,
+                                        stepL: STEP.CHECK_LOGIN_PARAMS,
+                                        state: STATE.ERROR,
+                                        error: ERR.LOGIN_NO_CREDENTIAL
+
+                                    });
+                                    setTimeout(check, 1000);
+                                }
+                            };
+                            check();
+                        });
+                    });
+                },
+                // 2.2、请求登录接口
+                [STEP.LOGIN_API]: async () => {
+                    // 模拟点击了主站的弹窗
+                    return await stepHandler.doStep(STEP.LOGIN_API, async () => {
+                        // 1、请求登录接口
+                        let formData = new URLSearchParams();
+                        formData.append("username", config.username);
+                        formData.append("password", config.password);
+                        // 记住密码 +180 天
+                        let resp = await apiClient.post(`${getApiHost()}/login`, formData.toString(), {
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            }
+                        });
+                        if (200 !== resp.status || 200 !== resp.data.code) {
+                            throw ERR.LOGIN_API_FAILED;
+                        }
+                        let memberInfo = resp.data.data;
+                        // 2、记录用户信息、token
+                        if (memberInfo?.jwttoken) {
+                            config.setValue('token', memberInfo.jwttoken);
+                        }
+                        config.setValue('memberInfo', memberInfo);
+                        return {
+                            cookie: config.cookie
+                        };
+                    });
+                },
+            };
+            // 3、判断当前是否登录中
+            let isUserLogin = await isLogin();
+            if (!isUserLogin) {
+                // 4、执行步骤过程
+                await steps[STEP.CHECK_LOGIN_PARAMS]();
+                await steps[STEP.LOGIN_API]();
             }
-        }
-    }
-
-    /**
-     * 设置 cookie
-     * @param cookie
-     */
-    function setCookie(cookie) {
-        config.setValue('cookie', cookie);
-    }
-
-    /**
-     * 设置 userAgent
-     * @param userAgent
-     */
-    function setUserAgent(userAgent) {
-        config.setValue('userAgent', userAgent);
-    }
-
-    /**
-     * 统一调用 message 进行消息分发
-     * @param payload
-     */
-    function onMessage(payload) {
-        message?.onMessage(payload);
+            return {
+                username: config.username,
+                userAgent: config.userAgent,
+                cookie: config.cookie,
+                ...phaseData
+            };
+        }, phaseData);
     }
 
     /**
      * 判断当前是否网页登录中
      * @return {Promise<boolean>}
      */
-    async function isWebLogin() {
-        try {
-            // 1、访问【個人資料】页面，如果有@用户名，则说明是登录中
-            let res = await httpClient.get(`${config.host}/user/${config.username}/notice`);
-            return (res?.data || '').includes(`@${config.username}`);
-        } catch (_) {
+    async function isLogin() {
+        if (!config.token || !config?.memberInfo?.uid) {
             return false;
         }
-    }
-
-    /**
-     * 判断是否 403
-     * @return {Promise<boolean>}
-     */
-    async function is403() {
-        try {
-            // 1、访问【分類】页，如果状态 403 则需要重新验证 cloudflare
-            let res = await httpClient.get(`${config.host}/theme/`);
-            return 403 === res.status;
-        } catch {
-            return true;
-        }
-    }
-
-    /**
-     * 请求api接口
-     * @param uri
-     * @param data
-     * @param get
-     * @return {Promise<string|null>}
-     */
-    async function reqApi(uri, data, get = true) {
-        let apiHost = apiHosts[Math.floor(Math.random() * apiHosts.length)];
-        let {
-            ts,
-            headers
-        } = decideHeadersAndTs(uri);
-        let resp;
-        if (get) {
-            resp = await httpClient.get(`${apiHost}${uri}`, {
-                headers: {
-                    ...headers
-                }
-            });
-        } else {
-            resp = await httpClient.post(`${apiHost}${uri}`, data ,{
-                headers: {
-                    ...headers
-                }
-            });
-        }
-        let result = resp?.data?.data || '';
-        if (!result) {
-            return null;
-        }
-        if (Array.isArray(result) && result.length === 0) {
-            return null;
-        }
-        return decodeRespData(result, ts);
+        return true;
     }
 
     /**
@@ -239,7 +241,7 @@ function createCrawler(manifest, ctx, message, config) {
         return retryAndCatch(func, async (err) => {
             if (403 === err.status) {
                 // 出现403错误，需要重新登录
-                await webLogin(err.phase, err.phaseData);
+                await login(err.phase, err.phaseData);
                 // 不退出继续重试
                 return false;
             }
@@ -254,131 +256,6 @@ function createCrawler(manifest, ctx, message, config) {
             // 退出
             return true;
         });
-    }
-
-    /**
-     * 进行 JM 网页登录（有锁）
-     * 1、通过 cloudflare 校验，获取 cf_clearance、ipcountry、ipm5、theme=light、AVS、sticky 这些 cookie 头
-     * 2、GET 访问/albums/meiman 页面，会返回 set-cookie，ipcountry、ipm5
-     * 3、POST 请求/login 接口，继续追加 cookie
-     * 4、再次跳转会/albums/meiman 页面
-     * @return {Promise<{cookie, userAgent, username}|*>}
-     */
-    async function webLogin(phase = PHASE.LOGIN, phaseData = {}) {
-        phase = phase || PHASE.LOGIN;
-        phaseData = phaseData || {};
-        // 1、定义使用到的页面、api
-        let PAGE_INDEX = `${config.host}/albums/meiman`;
-        let PAGE_LOGIN = `${config.host}/login`;
-        let API_LOGIN = `${config.host}/login`;
-        return await message.doLockPhase(phase, async (stepHandler) => {
-            // 2、定义步骤过程
-            let steps = {
-                // 2.1、检查当前用户名密码是否有填写
-                [STEP.CHECK_LOGIN_PARAMS]: async () => {
-                    return await stepHandler.doStep(STEP.CHECK_LOGIN_PARAMS, async () => {
-                        return new Promise((resolve, reject) => {
-                            // 1、定时验证用户名密码是否有填写，否则则不会进入登录流程
-                            const check = () => {
-                                if (config.username && config.password) {
-                                    resolve();
-                                } else {
-                                    // 通知前端
-                                    onMessage({
-                                        phase: PHASE.LOGIN,
-                                        stepL: STEP.CHECK_LOGIN_PARAMS,
-                                        state: STATE.ERROR,
-                                        error: ERR.LOGIN_NO_CREDENTIAL
-
-                                    });
-                                    setTimeout(check, 1000);
-                                }
-                            };
-                            check();
-                        });
-                    });
-                },
-                // 2.2、通过 CloudflareCookie 校验
-                [STEP.CLOUD_FLARE_COOKIE]: async () => {
-                    return await stepHandler.doStep(STEP.CLOUD_FLARE_COOKIE, async (stepMessageData, onProgress) => {
-                        // 1、访问出现 403，则需要验证 cloudflare
-                        let is403Flag = await is403();
-                        if (is403Flag) {
-                            // 2、请求 Cloudflare 的 cookie
-                            let {
-                                browser,
-                                page
-                            } = await connectByPuppeteerRealBrowser(config.proxy);
-                            let {
-                                cookie,
-                                userAgent,
-                                extraHeaders
-                            } = await getJmCloudflareCookie(browser, page, PAGE_LOGIN, onProgress);
-                            // 3、追加（覆盖）到当前 cookie 中
-                            setUserAgent(userAgent);
-                            setCookie(mergeCookie(config.cookie, cookie));
-                            setExtraHeaders(extraHeaders);
-                        }
-                        return {
-                            userAgent: config.userAgent,
-                            cookie: config.cookie
-                        };
-                    });
-                },
-                // 2.3、请求登录接口
-                [STEP.LOGIN_API]: async () => {
-                    // 模拟点击了主站的弹窗
-                    setCookie(mergeCookie(config.cookie, 'cover=1; guide=1'));
-                    return await stepHandler.doStep(STEP.LOGIN_API, async () => {
-                        let oldCookie = config.cookie;
-                        let formData = new FormData();
-                        formData.append("username", config.username);
-                        formData.append("password", config.password);
-                        formData.append("submit_login", String(1));
-                        // 记住密码 +180 天
-                        formData.append("id_remember", "on");
-                        formData.append("login_remember", "on");
-                        let apiResponse = await httpClient.post(API_LOGIN, formData, {
-                            'content-type': 'application/x-www-form-urlencoded'
-                        });
-                        if (apiResponse.status !== 200) {
-                            throw ERR.LOGIN_API_FAILED;
-                        }
-                        return {
-                            oldCookie: oldCookie,
-                            newCookie: config.cookie
-                        };
-                    });
-                },
-                // 2.4、请求首页
-                [STEP.INDEX_PAGE]: async () => {
-                    return await stepHandler.doStep(STEP.INDEX_PAGE, async () => {
-                        let res = await httpClient.get(PAGE_INDEX);
-                        return {
-                            status: res.status,
-                            data: res.data
-                        }
-                    });
-                }
-            };
-            // 3、判断当前是否登录中
-            let isUserLogin = await isWebLogin();
-            if (!isUserLogin) {
-                setCookie('');
-                // 4、执行步骤过程
-                await steps[STEP.CHECK_LOGIN_PARAMS]();
-                await steps[STEP.CLOUD_FLARE_COOKIE]();
-                // await steps[STEP.INDEX_PAGE]();
-                await steps[STEP.LOGIN_API]();
-                // await steps[STEP.INDEX_PAGE]();
-            }
-            return {
-                username: config.username,
-                userAgent: config.userAgent,
-                cookie: config.cookie,
-                ...phaseData
-            };
-        }, phaseData);
     }
 
     /**
@@ -397,10 +274,12 @@ function createCrawler(manifest, ctx, message, config) {
      */
     async function getMeta(number, phase = PHASE.GET_META) {
         return await message.doPhase(phase || PHASE.GET_META, async (stepHandler) => {
-            let data = await reqApi(`/album?id=${number}`);
+            let resp = await expireRetry(async () => {
+                return await apiClient.get(`${getApiHost()}/album?id=${number}`);
+            });
             return {
                 number,
-                meta: data
+                meta: resp.data.data
             };
         }, {number});
     }
@@ -421,117 +300,33 @@ function createCrawler(manifest, ctx, message, config) {
      * @param number
      * @param targetStream
      * @param phase
-     * @param withDownloadQueue 是否使用下载队列
+     * @param afterSteps
      * @return {Promise<null|*>}
      */
     async function downloadAlbumArchive(number, targetStream, phase = PHASE.FETCH_COMIC, afterSteps = null) {
-        // 1、定义使用到的页面、api
-        let PAGE_DOWNLOAD = `${config.host}/album_download/${number}`,
-            API_CAPTCHA = `${host}/captcha/`,
-            API_DOWNLOAD = `${host}/album_download/${number}`;
-        // 2、执行下载流程
+        number = Number(number);
+        // 1、执行下载流程
         return await message.doPhase(phase || PHASE.FETCH_COMIC, async (stepHandler, phaseMessageData) => {
-            // 4、开始下载
-            number = Number(number);
-            // 5、定义步骤过程
+            // 2、定义步骤过程
             let steps = {
-                // 2.1、请求下载页，0表示没数据，1表示有数据
-                [STEP.DOWNLOAD_PAGE]: async () => {
-                    return await stepHandler.doStep(STEP.DOWNLOAD_PAGE, async (stepMessageData) => {
-                        let downloadPage = await httpClient.get(PAGE_DOWNLOAD);
-                        let htmlText = downloadPage.data || '';
-                        // 2、漫画不存在
-                        if (htmlText.includes('非常抱歉，目前此本漫畫因上傳者不提供下載')) {
-                            throw ERR.COMIC_NOT_FOUND;
-                        }
-                        if (htmlText.includes('無效A漫連結或下載已關閉，謝謝。!')) {
-                            throw ERR.COMIC_NOT_FOUND;
-                        }
-                        if (!htmlText.includes(number)) {
-                            throw ERR.COMIC_NOT_FOUND;
-                        }
-                        return {
-                            status: 1
-                        }
-                    }, {number});
-                },
-                // 2、计算验证码（主动带重试）
-                [STEP.CAPTCHA]: async () => {
-                    let retryCount = null;
-                    return await stepHandler.doStep(STEP.CAPTCHA, async (stepMessageData, onProgress) => {
-                        const res = await httpClient.get(API_CAPTCHA, {
-                            responseType: 'arraybuffer' // ✅ Node 用这个
-                        });
-                        // 2、获取图片buffer
-                        const buffer = Buffer.from(res.data);
-                        // 3、转换base64，方便查看
-                        let base64Image = buffer2Base64Image(buffer);
-                        // 4、设置阈值
-                        let thresholds = [60, 80, 100, 120, 140, 160, 180, 200, 220];
-                        return retryAndCatch(async () => {
-                            if (null !== retryCount) {
-                                onProgress(retryCount * 10, 100);
-                            }
-                            // 4、验证码 OCR：语言包默认走 CDN（CaptchaUtil 内 langPath）
-                            let threshold = thresholds[retryCount || 0];
-                            let correctResult = await calcMathCaptcha(buffer, {
-                                // 传入随机值
-                                threshold: threshold
-                            });
-                            // 5、无结果或计算表达式不对，进行重试
-                            if (!correctResult?.verification) {
-                                // 抛出异常进行重试
-                                throw ERR.RETRY_CAPTCHA_ERROR;
-                            }
-                            onProgress(100, 100);
-                            return {
-                                threshold: threshold,
-                                captcha: base64Image,
-                                text: correctResult.text,
-                                mathText: correctResult.mathText,
-                                verification: correctResult.verification
-                            }
-                        }, (err, c) => {
-                            retryCount = c;
-                        }, 10);
-                    }, {number, retryCount})
-                },
                 // 3、请求漫画真实下载链接
-                [STEP.REAL_LINK]: async (captcha, verification) => {
+                [STEP.REAL_LINK]: async () => {
                     return await stepHandler.doStep(STEP.REAL_LINK, async (stepMessageData, onProgress) => {
-                        let formData = new FormData();
-                        formData.append("album_id", String(number));
-                        formData.append("verification", String(verification));
-                        let response = await httpClient.post(API_DOWNLOAD, formData, {
+                        let resp = await apiClient.get(`${getApiHost()}/album_download_2/${number}`, {
                             headers: {
-                                'content-type': 'application/x-www-form-urlencoded'
-                            },
-                            responseType: 'stream'
+                                'Authorization': 'Bearer ' + config.token
+                            }
                         });
-                        if ((response.headers['content-type'] || '').indexOf('zip') === -1) {
-                            // 1、非 zip，获取文本
-                            let htmlText = await getAxiosResponseText(response);
-                            htmlText = htmlText || '';
-                            if (!htmlText.includes(config.username)) {
-                                throw ERR.LOGIN_EXPIRE;
-                            }
-                            if (htmlText.includes('JCoin兌換')) {
-                                throw ERR.COMIC_PAY_ERROR;
-                            }
-                            throw ERR.RETRY_CAPTCHA_ERROR;
+                        if ('0' === resp?.data?.data?.status) {
+                            let error = new Error(resp?.data?.data?.msg || '');
+                            error.status = 403;
+                            throw error;
                         }
-                        let realUrl = `${response.request.protocol}//${response.request.host}/${response.request.path.substring(1)}`;
-                        // ✅ 关键：立刻关
-                        try {
-                            response.data.destroy();
-                            response.request.destroy();
-                        } catch (e) {
-                            console.log(e)
-                        }
+                        let realUrl = resp.data.data.download_url;
                         return {
                             url: realUrl
                         }
-                    }, {number, verification});
+                    }, {number});
                 },
                 // 4、下载漫画
                 [STEP.DOWNLOAD]: async (realUrl) => {
@@ -564,16 +359,15 @@ function createCrawler(manifest, ctx, message, config) {
                     }, {number});
                 }
             };
-            // 4、执行步骤过程
-            // await steps[STEP.DOWNLOAD_PAGE]();
-            // 同时间只能请求1个验证码
             try {
+                // 同时间只能请求1个真实链接
                 let url = await lock.acquire('captcha-real-link', async () => {
-                    let {captcha, verification} = await steps[STEP.CAPTCHA]();
-                    let {url} = await steps[STEP.REAL_LINK](captcha, verification);
+                    let {url} = await steps[STEP.REAL_LINK]();
                     return url;
                 });
-                let {complete, total} = await steps[STEP.DOWNLOAD](url);
+                let {complete, total} = await expireRetry(async () => {
+                    return await steps[STEP.DOWNLOAD](url);
+                });
                 return {
                     number,
                     complete,
@@ -583,7 +377,7 @@ function createCrawler(manifest, ctx, message, config) {
                 e.phase = PHASE.FETCH_COMIC;
                 e.phaseData = {
                     number
-                }
+                };
                 throw e;
             }
         });
@@ -851,7 +645,7 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     async function init() {
-        await webLogin();
+        await login();
     }
 
     async function close() {
@@ -859,7 +653,7 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     let account = {
-        webLogin: webLogin,
+        login: login,
         sign: sign
     };
 
@@ -1015,18 +809,20 @@ function createCrawler(manifest, ctx, message, config) {
          */
         byKeyword: async (keyword, page = 1, sort= SearchSort.Latest) => {
             // 1、请求到内容
-            let resp = await reqApi(`${ApiPath.Search}?${toQueryString({
-                "main_tag": 0,
-                "search_query": keyword,
-                "page": page,
-                "o": sort,
-            })}`);
+            let resp = await expireRetry(async () => {
+                return await apiClient.get(`${getApiHost()}/search?${toQueryString({
+                    "main_tag": 0,
+                    "search_query": keyword,
+                    "page": page,
+                    "o": sort,
+                })}`);
+            });
             // 2、获取总数，列表
             let {
                 search_query,
                 total,
                 content
-            } = resp;
+            } = resp?.data?.data || {};
             // 3、获取元信息
             return {
                 search_query,
@@ -1043,9 +839,10 @@ function createCrawler(manifest, ctx, message, config) {
          * @returns {Promise<{JmWeekInfo}>}
          */
         weekInfo: async() => {
-            return expireRetry(async () => {
-                return await reqApi(ApiPath.GetWeeklyInfo);
+            let resp = await expireRetry(async () => {
+                return await apiClient.get(`${getApiHost()}/week`);
             });
+            return resp.data.data;
         },
         /**
          * 获取每周必看
@@ -1055,7 +852,7 @@ function createCrawler(manifest, ctx, message, config) {
          */
         weekly: async (categoryId, typeId) => {
             let resp = await expireRetry(async () => {
-                return await reqApi(`${ApiPath.GetWeekly}?${toQueryString({
+                return await apiClient.get(`${getApiHost()}/week/filter?${toQueryString({
                     "id": categoryId,
                     "type": typeId
                 })}`);
@@ -1063,7 +860,7 @@ function createCrawler(manifest, ctx, message, config) {
             let {
                 total,
                 list
-            } = resp;
+            } = resp?.data?.data || {};
             return {
                 total,
                 list
@@ -1073,9 +870,10 @@ function createCrawler(manifest, ctx, message, config) {
          * 分类与排行
          */
         categories: async () => {
-            return expireRetry(async () => {
-                return await reqApi(ApiPath.GetCategories);
+            let resp = await expireRetry(async () => {
+                return await apiClient.get(`${getApiHost()}/categories`);
             });
+            return resp.data.data;
         },
         /**
          * 获取分类
@@ -1093,7 +891,7 @@ function createCrawler(manifest, ctx, message, config) {
                 ? `${order_by}_${time}`
                 : order_by;
             let resp = await expireRetry(async () => {
-                return await reqApi(`${ApiPath.getCategoriesFilter}?${toQueryString({
+                return await apiClient.get(`${getApiHost()}/categories/filter?${toQueryString({
                     'page': page,
                     'order': '',  // 该参数为空
                     'c': category || '0',
@@ -1103,7 +901,7 @@ function createCrawler(manifest, ctx, message, config) {
             let {
                 total,
                 content
-            } = resp;
+            } = resp.data.data || {};
             return {
                 total,
                 content,
@@ -1121,8 +919,7 @@ function createCrawler(manifest, ctx, message, config) {
         account,
         comic,
         search,
-        rank,
-        reqApi
+        rank
     };
 }
 

@@ -1,6 +1,9 @@
+const fs = require('node:fs');
+
 const jmBundle = require('../jm.bundle/jm.bundle.js');
 const {SearchSort} = require('../jm.bundle/protocol');
 const {toQueryString, fetchAllPageData} = require('../util/http');
+const {removeFile} = require('../util/file');
 
 async function getMeta(number) {
     try {
@@ -22,11 +25,12 @@ async function getMeta(number) {
      ApiPath::GetWeekly => "/week/filter",
      */
     await jmBundle.start({});
-    // let path = await jmBundle.state.crawler.fetchRemoteFile('https://cdn-msp2.18comic.vip/media/albums/1441017.jpg?u=1779420336');
-    // console.log(path);
-    // let meta = await getMeta(1044570);
-    // console.log(meta);
-    // await jmBundle.state.crawler.comic.downloadArchive(275942);
+    // await jmBundle.state.crawler.account.login();
+    removeFile(`${jmBundle.state.config.dataDir}/info/275942.json`);
+    removeFile(`${jmBundle.state.config.dataDir}/comic/275942.zip`);
+    let meta = await getMeta(275942);
+    console.log(meta);
+    await jmBundle.state.crawler.comic.downloadArchive(275942);
     // await jmBundle.state.crawler.search.byKeyword('明日方舟', SearchSort.Latest)
     // 1、获取每周必看期数
     // let weekInfo = await jmBundle.state.crawler.rank.monthInfo();
@@ -40,6 +44,6 @@ async function getMeta(number) {
     // console.log(serialization);
     // let categories = await jmBundle.state.crawler.rank.categories();
     // 同人、
-    await jmBundle.state.crawler.rank.categoriesFilter(1, 'a', 'doujin', 'mv');
-    console.log(categories);
+    // await jmBundle.state.crawler.rank.categoriesFilter(1, 'a', 'doujin', 'mv');
+    // console.log(categories);
 })();
