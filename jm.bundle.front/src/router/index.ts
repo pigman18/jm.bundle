@@ -8,6 +8,7 @@ export const router = createRouter({
     { path: '/search', name: 'search', component: () => import('@/pages/SearchPage.vue') },
     { path: '/week', name: 'week', component: () => import('@/pages/WeekPage.vue') },
     { path: '/category', name: 'category', component: () => import('@/pages/CategoryPage.vue') },
+    { path: '/serial', name: 'serial', component: () => import('@/pages/SerialPage.vue') },
     {
       path: '/detail/:num',
       name: 'detail',
@@ -26,6 +27,7 @@ router.afterEach((to) => {
   else if (to.name === 'search') document.title = 'JM 搜索'
   else if (to.name === 'week') document.title = 'JM 每周必看'
   else if (to.name === 'category') document.title = 'JM 分类排行'
+  else if (to.name === 'serial') document.title = 'JM 每日连载'
   else if (to.name === 'detail') document.title = `JM #${to.params.num}`
   else document.title = 'JM'
 })

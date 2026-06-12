@@ -275,7 +275,23 @@ function createCrawler(manifest, ctx, message, config) {
      * @return {Promise<void>}
      */
     async function sign() {
-
+        // 1、先登录
+        if (!config.token || !config?.memberInfo?.uid) {
+            await login();
+        }
+        await expireRetry(async () => {
+            let formData = new URLSearchParams();
+            formData.append("user_id", config?.memberInfo?.uid);
+            formData.append("daily_id", "1");
+            // 记住密码 +180 天
+            let resp = await apiClient.post(`${getApiHost()}/daily_chk`, formData.toString(), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Authorization': 'Bearer ' + config.token
+                }
+            });
+            return resp.data.data.msg;
+        });
     }
 
     /**

@@ -26,11 +26,22 @@ async function getMeta(number) {
      */
     await jmBundle.start({});
     // await jmBundle.state.crawler.account.login();
-    removeFile(`${jmBundle.state.config.dataDir}/info/275942.json`);
-    removeFile(`${jmBundle.state.config.dataDir}/comic/275942.zip`);
-    let meta = await getMeta(275942);
-    console.log(meta);
-    await jmBundle.state.crawler.comic.downloadArchive(275942);
+    // removeFile(`${jmBundle.state.config.dataDir}/info/275942.json`);
+    // removeFile(`${jmBundle.state.config.dataDir}/comic/275942.zip`);
+    // let meta = await getMeta(275942);
+    // console.log(meta);
+    let res = await jmBundle.state.crawler.account.sign();
+    console.log(res);
+    // await jmBundle.state.crawler.comic.downloadArchive(275942);
+    // let serialization0 = await jmBundle.state.crawler.rank.serialization(0);
+    // let serialization1 = await jmBundle.state.crawler.rank.serialization(1);
+    // let serialization2 = await jmBundle.state.crawler.rank.serialization(2);
+    // let serialization3 = await jmBundle.state.crawler.rank.serialization(3);
+    // let serialization4 = await jmBundle.state.crawler.rank.serialization(4);
+    // let serialization5 = await jmBundle.state.crawler.rank.serialization(5);
+    // let serialization6 = await jmBundle.state.crawler.rank.serialization(6);
+    // let serialization7 = await jmBundle.state.crawler.rank.serialization(7);
+    // console.log(serialization0);
     // await jmBundle.state.crawler.search.byKeyword('明日方舟', SearchSort.Latest)
     // 1、获取每周必看期数
     // let weekInfo = await jmBundle.state.crawler.rank.monthInfo();

@@ -119,6 +119,31 @@ function tokenAndTokenparam(ts, secret = JmMagicConstants.APP_TOKEN_SECRET, ver 
  * @param {string} [secret]
  * @return {string} json格式的字符串
  */
+function decodeDomainServerData(data, ts) {
+    // 1. base64解码
+    const dataB64 = Buffer.from(data, 'base64');
+    // 2. AES-ECB解密
+    const keyHex = md5hex(`${JmMagicConstants.API_DOMAIN_SERVER_SECRET}`);
+    const key = Buffer.from(keyHex, 'utf-8'); // ✅ 完全对齐 Python
+    const decipher = crypto.createDecipheriv('aes-256-ecb', key, null);
+    let decrypted = decipher.update(dataB64);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    // 3. 移除末尾的padding
+    // const padLen = decrypted[decrypted.length - 1];
+    // const result = decrypted.slice(0, -padLen);
+    // 4. 解码为字符串 (json)
+    let res = decrypted.toString('utf-8');
+    return tryParseJsonObject(res);
+}
+
+/**
+ * 解密接口返回值
+ *
+ * @param {string} data resp.json()['data']
+ * @param {number|string} ts 时间戳
+ * @param {string} [secret]
+ * @return {string} json格式的字符串
+ */
 function decodeRespData(data, ts, secret= JmMagicConstants.APP_DATA_SECRET) {
     // 1. base64解码
     const dataB64 = Buffer.from(data, 'base64');
@@ -185,6 +210,7 @@ function limitText(text, limit) {
 
 module.exports = {
     tokenAndTokenparam,
+    decodeDomainServerData,
     decodeRespData,
     decideHeadersAndTs,
     JmMagicConstants
