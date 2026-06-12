@@ -237,7 +237,7 @@ async function goDetail(c: Comic) {
             <div v-else class="jmz-card-ribbon jmz-card-ribbon--new">未收录</div>
             <span v-if="c.canRead" class="jmz-card-ribbon jmz-card-ribbon--read">可读</span>
             <img
-              class="jmz-card-cover"
+              class="jmz-card-cover xxx-img"
               :class="{ 'jmz-card-cover--show': coverReady(c.id, c.cover) }"
               :src="c.cover || ''"
               :alt="c.name"
@@ -250,11 +250,11 @@ async function goDetail(c: Comic) {
           </div>
           <div class="jmz-card-body">
             <div class="jmz-card-num">JM{{ c.id }}</div>
-            <h2 class="jmz-card-title">{{ c.name }}</h2>
+                  <h2 class="jmz-card-title xxx-text">{{ c.name }}</h2>
             <div v-if="c.author && c.author[0]" class="jmz-card-author">{{ c.author[0] }}</div>
             <div v-else class="jmz-card-author jmz-card-author--muted">作者未知</div>
             <div class="jmz-card-tags">
-              <span v-for="t in (c.tags || []).slice(0, 5)" :key="t" class="jmz-chip">{{ t }}</span>
+              <span v-for="t in (c.tags || []).slice(0, 5)" :key="t" class="jmz-chip xxx-text">{{ t }}</span>
               <span v-if="(c.tags || []).length > 5" class="jmz-chip jmz-chip--more">+{{ (c.tags || []).length - 5 }}</span>
               <span v-if="!c.tags || !c.tags.length" class="jmz-chip jmz-chip--ghost">无标签</span>
             </div>

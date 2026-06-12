@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, inject, onUnmounted } from 'vue'
+import { ref, computed, watch, inject, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { getJson, postJson } from '@/api'
@@ -13,6 +13,8 @@ const props = defineProps<{ num?: string }>()
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+
+const applyHarmony = inject<(() => void) | undefined>('applyHarmony', undefined)
 const live = useJmLiveStore()
 
 const albumNum = computed(() => Math.floor(Number(props.num || route.params.num)))
@@ -62,6 +64,8 @@ async function loadDetail(silent = false) {
     if (!silent) { message.error(String(e?.message || e)); comic.value = null }
   } finally {
     if (!silent) loading.value = false
+    await nextTick()
+    applyHarmony?.()
   }
 }
 
@@ -265,17 +269,17 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
         <div class="jmz-detail">
           <section :class="['jmz-detail-hero', 'jmz-panel', 'jmz-panel--pad', detailHeroClass]">
             <div class="jmz-detail-cover-wrap">
-              <img class="jmz-detail-cover" :src="comic.cover || ''" :alt="comic.name" />
+              <img class="jmz-detail-cover xxx-img" :src="comic.cover || ''" :alt="comic.name" />
             </div>
             <div class="jmz-detail-meta">
-              <h1 class="jmz-detail-title">{{ comic.name }}</h1>
+              <h1 class="jmz-detail-title xxx-text">{{ comic.name }}</h1>
               <p class="jmz-detail-line">JM{{ comic.id }} · {{ comic.displayKindLabel }}</p>
               <p v-if="comic.author && comic.author[0]" class="jmz-detail-line">
                 <span class="jmz-detail-author-label">作者：</span>
                 <span class="jmz-author-link" role="link" tabindex="0" @click="filterByAuthor(comic.author[0], $event)" @keyup.enter="filterByAuthor(comic.author[0], $event)">{{ comic.author[0] }}</span>
               </p>
               <div v-if="comic.tags?.length" class="jmz-detail-tags">
-                <span v-for="t in comic.tags" :key="t" class="jmz-chip jmz-chip--click" role="link" tabindex="0" @click="filterByTag(t, $event)" @keyup.enter="filterByTag(t, $event)">{{ t }}</span>
+                <span v-for="t in comic.tags" :key="t" class="jmz-chip jmz-chip--click xxx-text" role="link" tabindex="0" @click="filterByTag(t, $event)" @keyup.enter="filterByTag(t, $event)">{{ t }}</span>
               </div>
               <p v-if="comic.description" class="jmz-intro">{{ comic.description }}</p>
             </div>
@@ -302,8 +306,8 @@ const detailHeroClass = computed(() => asideRows.value.length ? 'jmz-detail-hero
                 :key="row.zipKey"
                 :class="['jmz-zip-row', `jmz-zip-tone-${(i % 4) + 1}`]"
               >
-                <div class="jmz-zip-cell jmz-zip-cell--num">{{ row.zipLabel }}</div>
-                <div class="jmz-zip-cell jmz-zip-cell--title" :title="row.epTitle">{{ row.epTitle }}</div>
+                <div class="jmz-zip-cell jmz-zip-cell--num xxx-text">{{ row.zipLabel }}</div>
+                <div class="jmz-zip-cell jmz-zip-cell--title xxx-text" :title="row.epTitle">{{ row.epTitle }}</div>
                 <div class="jmz-zip-cell jmz-zip-cell--action">
                   <template v-if="dlUi(row).kind === 'ready'">
                     <n-button type="success" @click="onRead(row)">阅读</n-button>

@@ -42,6 +42,7 @@ module.exports = {
                 parser: {dynamicImportMode: 'eager'},
             },
             {test: /\.node$/, loader: 'node-loader'},
+            {test: /\.md$/, type: 'asset/source'},
         ],
     },
     plugins: [

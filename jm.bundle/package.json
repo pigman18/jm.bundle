@@ -27,6 +27,8 @@
     "express-ws": "^5.0.2",
     "https-proxy-agent": "^9.1.0",
     "jszip": "^3.10.1",
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
     "morgan": "^1.10.1",
     "node-notifier": "^10.0.1",
     "p-queue": "^9.3.0",

@@ -400,7 +400,7 @@ const orderOptions = [
               </div>
               <img
                 :ref="(el: any) => onCoverImg(el, c.id, c.cover)"
-                class="jmz-card-cover"
+                class="jmz-card-cover xxx-img"
                 :class="{ 'jmz-card-cover--show': coverReady(c.id, c.cover) }"
                 :src="c.cover || ''"
                 :alt="c.name"
@@ -416,7 +416,7 @@ const orderOptions = [
             </div>
             <div class="jmz-card-body">
               <div class="jmz-card-num">JM{{ c.id }}</div>
-              <h2 class="jmz-card-title">{{ c.name }}</h2>
+                  <h2 class="jmz-card-title xxx-text">{{ c.name }}</h2>
               <div
                 v-if="c.author && c.author[0]"
                 class="jmz-card-author jmz-author-link"
@@ -430,7 +430,7 @@ const orderOptions = [
                 <span
                   v-for="t in tagsLine(c)"
                   :key="t"
-                  class="jmz-chip jmz-chip--click"
+                  class="jmz-chip jmz-chip--click xxx-text"
                   role="link"
                   tabindex="0"
                   @click.stop="filterByTag(t, $event)"

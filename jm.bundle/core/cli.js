@@ -448,6 +448,26 @@ Examples:
             list.forEach(i => console.log(i.aid));
         });
 
+    /* ================= Readme / Changelog ================= */
+    const { marked } = require('marked');
+    const { markedTerminal } = require('marked-terminal');
+    marked.use(markedTerminal());
+
+    function renderMarkdown(text) {
+        if (!text) { console.log('（无内容）'); return }
+        console.log(marked.parse(text));
+    }
+
+    program
+        .command('readme')
+        .description('显示 README')
+        .action(() => { renderMarkdown(manifest.readme) });
+
+    program
+        .command('changelog')
+        .description('显示 CHANGELOG')
+        .action(() => { renderMarkdown(manifest.changelog) });
+
     return {
         run: async () => {
             // 只有“完全没有任何参数”才走默认 server

@@ -13,6 +13,12 @@ const {createTaskManager} = require('./core/taskManager');
 let manifest = require(`./package.json`);
 // 2、设置当前工作目录
 manifest.workspace = process.cwd();
+// 3、加载文档内容（dev 模式读文件，webpack 构建时通过 asset/source 内联）
+let readmeContent = '', changelogContent = '';
+try { readmeContent = require('./README.md') } catch { try { readmeContent = require('node:fs').readFileSync(require('node:path').join(__dirname, 'README.md'), 'utf8') } catch {} }
+try { changelogContent = require('./CHANGELOG.md') } catch { try { changelogContent = require('node:fs').readFileSync(require('node:path').join(__dirname, 'CHANGELOG.md'), 'utf8') } catch {} }
+manifest.readme = readmeContent;
+manifest.changelog = changelogContent;
 
 /**
  * 定义一个完整模块

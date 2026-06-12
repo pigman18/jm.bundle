@@ -44,6 +44,7 @@
                 <template #icon><n-icon :component="DownloadOutline" /></template>
                 <span>下载全部</span>
               </n-button>
+              <n-checkbox v-if="!isDetail" v-model:checked="harmonyEnabled" size="small" class="jmz-harmony-checkbox">和谐化</n-checkbox>
               <n-button text size="small" class="jmz-header-btn" @click="openTasks">
                 <template #icon><n-icon :component="ListOutline" /></template>
                 <span>任务</span>
@@ -68,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, provide, onMounted, onUnmounted, nextTick } from 'vue'
 import { zhCN, dateZhCN, darkTheme } from 'naive-ui'
 import { ArrowBack, CloudUploadOutline, CloudDownloadOutline, ListOutline, DownloadOutline } from '@vicons/ionicons5'
 import { useRoute, useRouter } from 'vue-router'
@@ -94,6 +95,41 @@ provide('sendWs', (msg: string) => { try { ws?.send(msg) } catch {} })
 const currentPageComics = ref<Comic[]>([])
 provide('currentPageComics', currentPageComics)
 const showBatchDownload = ref(false)
+
+const harmonyEnabled = ref(localStorage.getItem('harmonyEnabled') === 'true')
+provide('harmonyEnabled', harmonyEnabled)
+provide('applyHarmony', applyHarmony)
+watch(harmonyEnabled, (v) => {
+  localStorage.setItem('harmonyEnabled', String(v))
+  applyHarmony()
+})
+watch(currentPageComics, () => {
+  if (harmonyEnabled.value) nextTick(applyHarmony)
+})
+watch(() => route.name, () => {
+  if (harmonyEnabled.value) nextTick(applyHarmony)
+})
+
+function harmonyText(text: string): string {
+  const fill = '文本'
+  if (!text) return text
+  return fill.repeat(Math.ceil(text.length / fill.length)).slice(0, text.length)
+}
+function applyHarmony() {
+  document.documentElement.classList.toggle('harmonize', harmonyEnabled.value)
+  if (harmonyEnabled.value) {
+    document.querySelectorAll('.xxx-text').forEach(el => {
+      if (!(el instanceof HTMLElement)) return
+      if (!el.dataset.orig) el.dataset.orig = el.textContent || ''
+      el.textContent = harmonyText(el.dataset.orig)
+    })
+  } else {
+    document.querySelectorAll('.xxx-text').forEach(el => {
+      if (!(el instanceof HTMLElement)) return
+      if (el.dataset.orig) el.textContent = el.dataset.orig
+    })
+  }
+}
 
 function openTasks() { showTasks.value = true }
 function backToCatalog() {
@@ -155,7 +191,10 @@ function connectWs() {
   }
 }
 
-onMounted(() => connectWs())
+onMounted(() => {
+  connectWs()
+  if (harmonyEnabled.value) nextTick(applyHarmony)
+})
 
 onUnmounted(() => {
   if (pingTimer) clearInterval(pingTimer)
@@ -325,5 +364,18 @@ onUnmounted(() => {
 
 .jmz-app-main {
   flex: 1;
+}
+
+.jmz-harmony-checkbox {
+  margin-right: 4px;
+}
+.jmz-harmony-checkbox .n-checkbox__label {
+  font-size: 12px !important;
+  color: #9b9bb4 !important;
+}
+
+.harmonize .xxx-img,
+.harmonize img.xxx-img {
+  opacity: 0 !important;
 }
 </style>
