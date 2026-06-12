@@ -51,22 +51,6 @@ module.exports = {
             const stub = path.join(__dirname, 'empty-web-embedded.json');
             resource.request = fs.existsSync(distEmb) ? distEmb : stub;
         }),
-        // tesseract.js/dist/worker.min.js 改成base64打包进代码
-        new webpack.DefinePlugin({
-            // 1、打包 tesseract.js 的 worker-script
-            __TESSERACT_NODE_WORKER__: (() => {
-                execSync(`npx webpack --config build/webpack.config.tesseract.js`, {
-                    stdio: 'inherit'
-                });
-                let workerPath = path.resolve(__dirname, '../dist/worker-script.node.js');
-                return JSON.stringify(fs.readFileSync(workerPath, 'utf8'))
-            })(),
-            // 2、打包 wasm
-            __TESSERACT_WASM_BASE64__: (() => {
-                let wasmPath = require.resolve('tesseract.js-core/tesseract-core-relaxedsimd.wasm');
-                return JSON.stringify(fs.readFileSync(wasmPath).toString('base64'))
-            })(),
-        }),
     ],
     externals: {
         'encoding': 'commonjs encoding'

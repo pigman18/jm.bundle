@@ -58,9 +58,6 @@ module.exports = {
         }),
     ],
     externals: {
-        'puppeteer': 'commonjs puppeteer',
-        'sleep': 'commonjs sleep',
-        'tesseract.js': 'commonjs tesseract.js',
         'encoding': 'commonjs encoding'
     },
     resolve: {
