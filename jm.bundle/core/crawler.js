@@ -272,14 +272,14 @@ function createCrawler(manifest, ctx, message, config) {
 
     /**
      * 签到
-     * @return {Promise<void>}
+     * @return {Promise<object>}
      */
     async function sign() {
         // 1、先登录
         if (!config.token || !config?.memberInfo?.uid) {
             await login();
         }
-        await expireRetry(async () => {
+        return await expireRetry(async () => {
             let formData = new URLSearchParams();
             formData.append("user_id", config?.memberInfo?.uid);
             formData.append("daily_id", "1");
@@ -290,7 +290,9 @@ function createCrawler(manifest, ctx, message, config) {
                     'Authorization': 'Bearer ' + config.token
                 }
             });
-            return resp.data.data.msg;
+            return {
+                msg: resp.data.data.msg
+            };
         });
     }
 
