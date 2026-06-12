@@ -46,6 +46,7 @@
                 <span>下载全部</span>
               </n-button>
               <n-checkbox v-if="!isDetail" v-model:checked="harmonyEnabled" size="small" class="jmz-harmony-checkbox">和谐化</n-checkbox>
+              <UserBar />
               <n-button text size="small" class="jmz-header-btn" @click="openTasks">
                 <template #icon><n-icon :component="ListOutline" /></template>
                 <span>任务</span>
@@ -81,6 +82,7 @@ import { postJson } from '@/api'
 import type { Comic } from '@/types'
 import TasksDialog from '@/components/TasksDialog.vue'
 import BatchDownloadDialog from '@/components/BatchDownloadDialog.vue'
+import UserBar from '@/components/UserBar.vue'
 import { peekCatalogReturnQuery } from '@/utils/catalogReturn'
 
 const route = useRoute()

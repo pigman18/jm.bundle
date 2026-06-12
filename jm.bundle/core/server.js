@@ -603,6 +603,17 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         });
     }
 
+    function handleAccountSign(app, api) {
+        app.post(`${api}/account/sign`, async (_req, res) => {
+            try {
+                const result = await crawler.account.sign();
+                res.json({ok: true, msg: result?.msg || '签到成功'});
+            } catch (e) {
+                res.json({ok: false, message: String(e.message || e)});
+            }
+        });
+    }
+
     function handleCategoryInfo(app, api) {
         app.get(`${api}/category/info`, async (req, res) => {
             try {
@@ -845,6 +856,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         handleSerialComics(app, api);
         handleCategoryInfo(app, api);
         handleCategoryFilter(app, api);
+        handleAccountSign(app, api);
         handleDownload(app, api);
         handleBatchAdd(app, api);
         handleZipFile(app, api);
