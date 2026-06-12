@@ -15,7 +15,7 @@ const {retryAndCatch} = require('../../util/common');
 const {url2DataPath, saveAxiosResponse, getResponseStream, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData} = require('../../util/http');
 const {touchFileSync, writeToFileSync, isNotEmptySync, renameSync} = require('../../util/file');
 const {parseComicRankingPage, parseSerializationList, parseWeekList, parseComicWeekList, parseMeta, parseNumber} = require('./parser');
-const {decideHeadersAndTs, tokenAndTokenparam, decodeRespData} = require('./mobile');
+const {JmMagicConstants, decideHeadersAndTs, decodeDomainServerData, decodeRespData} = require('./mobile');
 
 const UserAgents = require('../resources/userAgents');
 
@@ -83,12 +83,20 @@ function createCrawler(manifest, ctx, message, config) {
         });
         apiClient.interceptors.response.use((resp) => {
             const ts = resp.config.__jm_ts;
-            if (!!resp.config?.ignoredDecode) return resp;
+            if (!!resp.config?.withIgnoredDecode) return resp;
             try {
-                const raw = resp?.data?.data || '';
-                // 1、解码数据
-                if (!!raw && !((Array.isArray(raw) && raw.length === 0))) {
-                    resp.data.data = decodeRespData(raw, ts);
+                if (JmMagicConstants.API_DOMAIN_SERVER_SECRET === resp.config.decodeSecret) {
+                    let raw = resp?.data || '';
+                    // 1、解码域名
+                    if (!!raw && !((Array.isArray(raw) && raw.length === 0))) {
+                        resp.data = decodeDomainServerData(raw, ts);
+                    }
+                } else {
+                    let raw = resp?.data?.data || '';
+                    // 2、解码普通请求
+                    if (!!raw && !((Array.isArray(raw) && raw.length === 0))) {
+                        resp.data.data = decodeRespData(raw, ts);
+                    }
                 }
             } catch (e) {
                 console.warn('JM decode failed', e);
@@ -129,6 +137,24 @@ function createCrawler(manifest, ctx, message, config) {
     }
 
     /**
+     * 拉取最新api域名
+     * @return {Promise<unknown[]>}
+     */
+    async function fetchLatestApiHosts() {
+        let resp = await apiClient.get(`https://rup4a04-c02.tos-cn-hongkong.bytepluses.com/newsvr-2025.txt`, {
+            decodeSecret: JmMagicConstants.API_DOMAIN_SERVER_SECRET
+        });
+        let apiHosts = (resp?.data?.Setting || []).map((host) => {
+            if (!host.startsWith('http')) {
+                return `https://${host}`;
+            }
+            return host;
+        });
+        config.setValue('apiHosts', apiHosts);
+        return apiHosts;
+    }
+
+    /**
      * 获取apiHost
      * @return {*}
      */
@@ -148,7 +174,6 @@ function createCrawler(manifest, ctx, message, config) {
         phase = phase || PHASE.LOGIN;
         phaseData = phaseData || {};
         // 1、定义使用到的页面、api
-        let API_LOGIN = `${getApiHost()}/login`;
         return await message.doLockPhase(phase, async (stepHandler) => {
             // 2、定义步骤过程
             let steps = {
@@ -205,31 +230,18 @@ function createCrawler(manifest, ctx, message, config) {
                     });
                 },
             };
-            // 3、判断当前是否登录中
-            let isUserLogin = await isLogin();
-            if (!isUserLogin) {
-                // 4、执行步骤过程
-                await steps[STEP.CHECK_LOGIN_PARAMS]();
-                await steps[STEP.LOGIN_API]();
-            }
+            // 3、执行步骤过程
+            await steps[STEP.CHECK_LOGIN_PARAMS]();
+            await steps[STEP.LOGIN_API]();
             return {
                 username: config.username,
                 userAgent: config.userAgent,
                 cookie: config.cookie,
+                token: config.token,
+                memberInfo: config.memberInfo,
                 ...phaseData
             };
         }, phaseData);
-    }
-
-    /**
-     * 判断当前是否网页登录中
-     * @return {Promise<boolean>}
-     */
-    async function isLogin() {
-        if (!config.token || !config?.memberInfo?.uid) {
-            return false;
-        }
-        return true;
     }
 
     /**
@@ -479,41 +491,6 @@ function createCrawler(manifest, ctx, message, config) {
                 await onPage(pageInfo);
                 return pageInfo;
             }, page);
-        });
-    }
-
-    /**
-     * 拉取漫画每周连载更新，适用于以下链接
-     * https://18comic.vip/serialization/0
-     * https://18comic.vip/serialization/1
-     * @return {Promise<void>}
-     */
-    async function listSerialsAlbums(url, label, onList) {
-        return await message.doPhase(PHASE.FETCH_SERIALIZATION, async (stepHandler, phaseMessageData) => {
-            return await expireRetry(async () => {
-                {
-                    if (!url) {
-                        return {
-                            list: [],
-                            label: label
-                        };
-                    }
-                    // 1、请求html内容
-                    const res = await httpClient.get(url);
-                    let html = res?.data || '';
-                    if (!html) {
-                        // 登录失效
-                        throw ERR.LOGIN_EXPIRE;
-                    }
-                    // 2、解析page
-                    let list = parseSerializationList(html);
-                    await onList(label, list);
-                    return {
-                        list: list,
-                        label: label
-                    }
-                }
-            })
         });
     }
 
@@ -867,6 +844,21 @@ function createCrawler(manifest, ctx, message, config) {
             }
         },
         /**
+         * @param date
+         * 分类与排行
+         */
+        serialization: async (date) => {
+            let resp = await expireRetry(async () => {
+                return await apiClient.get(`${getApiHost()}/serialization?date=${date}`);
+            });
+            let {
+                list
+            } = resp.data.data;
+            return {
+                list
+            };
+        },
+        /**
          * 分类与排行
          */
         categories: async () => {
@@ -919,7 +911,8 @@ function createCrawler(manifest, ctx, message, config) {
         account,
         comic,
         search,
-        rank
+        rank,
+        fetchLatestApiHosts
     };
 }
 
