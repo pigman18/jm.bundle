@@ -33,15 +33,21 @@ function openDatabase(filePath) {
             const stmt = db.prepare(sql);
 
             return {
-                run(values) {
-                    return stmt.run(normalizeParams(values));
-                },
-                get(values) {
-                    return stmt.get(normalizeParams(values));
-                },
-                all(values) {
-                    return stmt.all(normalizeParams(values));
-                },
+        run(values) {
+            const p = normalizeParams(values);
+            if (p === undefined) return stmt.run();
+            return stmt.run(p);
+        },
+        get(values) {
+            const p = normalizeParams(values);
+            if (p === undefined) return stmt.get();
+            return stmt.get(p);
+        },
+        all(values) {
+            const p = normalizeParams(values);
+            if (p === undefined) return stmt.all();
+            return stmt.all(p);
+        },
             };
         },
 

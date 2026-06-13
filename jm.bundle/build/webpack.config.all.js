@@ -41,7 +41,11 @@ module.exports = {
                 test: /\.js$/,
                 parser: {dynamicImportMode: 'eager'},
             },
-            {test: /\.node$/, loader: 'node-loader'},
+            {
+                test: /\.(js|mjs|node)$/,
+                loader: '@vercel/webpack-asset-relocator-loader',
+                options: { outputAsset: false },
+            },
             {test: /\.md$/, type: 'asset/source'},
         ],
     },

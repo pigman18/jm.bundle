@@ -21,6 +21,7 @@
     "undici": "^6.21.3"
   },
   "devDependencies": {
+    "@vercel/webpack-asset-relocator-loader": "^1.10.0",
     "bufferutil": "^4.1.0",
     "node-loader": "^2.1.0",
     "rcedit": "^4.0.1",
