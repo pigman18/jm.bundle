@@ -308,7 +308,7 @@ function createCrawler(manifest, ctx, message, config) {
                 return await apiClient.get(`${getApiHost()}/album?id=${number}`);
             });
             let meta = resp.data.data;
-            if (!meta.id) {
+            if (!meta?.id) {
                 throw ERR.INFO_NOT_FOUND;
             }
             return {
