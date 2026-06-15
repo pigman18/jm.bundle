@@ -122,7 +122,7 @@ function createCli(
                         const etaMs = avgMs * remaining;
 
                         console.log(
-                            `✅ 已完成 ${done} | 剩余 ${remaining} | 已用 ${formatDuration(elapsedMs)} | 预计还需 ${formatDuration(etaMs)}`
+                            `✅ 已执行 ${done} | 剩余 ${remaining} | 已用 ${formatDuration(elapsedMs)} | 预计还需 ${formatDuration(etaMs)}`
                         );
                     }
                 }
