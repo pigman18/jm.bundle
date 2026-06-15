@@ -2,13 +2,13 @@ const fs = require('node:fs');
 const {listFiles, getBaseName} = require('../util/file');
 
 (async () => {
-    let files = listFiles('C:\\data\\jm\\html');
-    let existsNumbers = files.map((file) => Number.parseInt(getBaseName(file)));
-    let numbers = JSON.parse(fs.readFileSync('./fetchInfo.json', 'utf-8'));
-    existsNumbers = [
-        ...existsNumbers,
-        ...numbers
-    ];
-    existsNumbers = [...new Set(existsNumbers)];
-    fs.writeFileSync('./fetchInfo.json', JSON.stringify(existsNumbers));
+    let numbers = Array.from({ length: 1600000 - 1 + 1 }, (_, i) => 1 + i);
+    let complete = 0;
+    numbers = numbers.filter((number) => {
+        let flag = !fs.existsSync(`C:\\jm\\info\\${number}.json`);
+        complete += 1;
+        console.log(`进度：${complete} / ${numbers.length}`);
+        return flag;
+    });
+    fs.writeFileSync('./fetchInfo.json', JSON.stringify(numbers));
 })();

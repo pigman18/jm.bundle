@@ -307,9 +307,13 @@ function createCrawler(manifest, ctx, message, config) {
             let resp = await expireRetry(async () => {
                 return await apiClient.get(`${getApiHost()}/album?id=${number}`);
             });
+            let meta = resp.data.data;
+            if (!meta.id) {
+                throw ERR.INFO_NOT_FOUND;
+            }
             return {
                 number,
-                meta: resp.data.data
+                meta: meta
             };
         }, {number});
     }

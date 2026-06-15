@@ -20,7 +20,7 @@ function createCli(
     server
 ) {
     const program = new Command();
-    const queue = new PQueue({concurrency: 15});
+    const queue = new PQueue({concurrency: 30});
 
     program.description(manifest.description)
         .version(manifest.version, null, '查看版本')
@@ -63,7 +63,7 @@ function createCli(
         return JSON.parse(fs.readFileSync(p, 'utf-8'));
     };
 
-    const wait = () => sleep(100 + Math.random() * 100);
+    const wait = () => sleep(50 + Math.random() * 50);
 
     async function processBatch(list, fn) {
         list.forEach(i => queue.add(() => fn(i)));
@@ -105,7 +105,7 @@ function createCli(
         let done = 0;
 
         while (numbers.length) {
-            const batch = shuffleArray([...new Set(numbers)]).slice(0, 10);
+            const batch = shuffleArray([...new Set(numbers)]).slice(0, 15);
 
             await processBatch(batch, async (n) => {
                 try {

@@ -26,12 +26,13 @@ async function getMeta(number) {
      */
     await jmBundle.start({});
     // await jmBundle.state.crawler.account.login();
-    // removeFile(`${jmBundle.state.config.dataDir}/info/275942.json`);
-    // removeFile(`${jmBundle.state.config.dataDir}/comic/275942.zip`);
-    // let meta = await getMeta(275942);
-    // console.log(meta);
-    let res = await jmBundle.state.crawler.account.sign();
-    console.log(res);
+    removeFile(`${jmBundle.state.config.dataDir}/info/360203.json`);
+    removeFile(`${jmBundle.state.config.dataDir}/comic/360203.zip`);
+    let meta = await getMeta(275942);
+    let meta1 = await getMeta(360203);
+    console.log(meta);
+    // let res = await jmBundle.state.crawler.account.sign();
+    // console.log(res);
     // await jmBundle.state.crawler.comic.downloadArchive(275942);
     // let serialization0 = await jmBundle.state.crawler.rank.serialization(0);
     // let serialization1 = await jmBundle.state.crawler.rank.serialization(1);
