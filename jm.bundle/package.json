@@ -17,6 +17,8 @@
     "search:keyword": "node jm.bundle.js search:keyword",
     "rank:weekly": "node jm.bundle.js rank:weekly",
     "rank:serials": "node jm.bundle.js rank:serials",
+    "local2db": "node jm.bundle.js local2db",
+    "db2local": "node jm.bundle.js db2local",
     "server": "node jm.bundle.js server",
     "command": "node jm.bundle.js"
   },

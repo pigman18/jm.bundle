@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const Database = require('better-sqlite3');
+const sqlite = require('node:sqlite');
 
 function normalizeParams(values) {
     if (values == null) return undefined;
@@ -11,18 +11,16 @@ function normalizeParams(values) {
 
 function openDatabase(filePath) {
     const fp = path.resolve(String(filePath || '').trim());
-    if (!fp) {
-        throw new Error('sqlite: empty database path');
-    }
+    if (!fp) throw new Error('sqlite: empty database path');
 
-    const db = new Database(fp, {
-        readonly: false,
-        fileMustExist: false,
+    const db = new sqlite.DatabaseSync(fp, {
+        openMode: sqlite.DatabaseSync.OPEN_READWRITE |
+            sqlite.DatabaseSync.OPEN_CREATE,
     });
 
-    // ✅ 推荐配置
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
+    // ✅ 兼容所有 Node 22 版本
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA synchronous = NORMAL');
 
     return {
         exec(sql) {
@@ -33,26 +31,20 @@ function openDatabase(filePath) {
             const stmt = db.prepare(sql);
 
             return {
-        run(values) {
-            const p = normalizeParams(values);
-            if (p === undefined) return stmt.run();
-            return stmt.run(p);
-        },
-        get(values) {
-            const p = normalizeParams(values);
-            if (p === undefined) return stmt.get();
-            return stmt.get(p);
-        },
-        all(values) {
-            const p = normalizeParams(values);
-            if (p === undefined) return stmt.all();
-            return stmt.all(p);
-        },
+                run(values) {
+                    return stmt.run(normalizeParams(values));
+                },
+                get(values) {
+                    return stmt.get(normalizeParams(values));
+                },
+                all(values) {
+                    return stmt.all(normalizeParams(values));
+                },
             };
         },
 
         commit() {
-            // better-sqlite3 自动提交事务
+            // node:sqlite 自动提交
         },
 
         close() {

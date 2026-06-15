@@ -448,6 +448,26 @@ Examples:
             list.forEach(i => console.log(i.aid));
         });
 
+    /* ================= Sync ================= */
+
+    program
+        .command('local2db')
+        .description('本地 info 文件同步到数据库')
+        .action(async () => {
+            console.log('同步本地 → 数据库...');
+            const count = await store.runLocal2Db();
+            console.log(`同步完成，共处理 ${count} 条`);
+        });
+
+    program
+        .command('db2local')
+        .description('数据库同步到本地 info 文件')
+        .action(async () => {
+            console.log('同步数据库 → 本地...');
+            const count = await store.runDb2Local();
+            console.log(`同步完成，共导出 ${count} 条`);
+        });
+
     /* ================= Readme / Changelog ================= */
     const { marked } = require('marked');
     const { markedTerminal } = require('marked-terminal');
