@@ -137,6 +137,14 @@ function createStore(manifest, ctx, message, config, crawler) {
         // 兼容旧表：可能缺少 create_time / update_time
         try { database.exec('ALTER TABLE comic_meta ADD COLUMN create_time INTEGER'); } catch (_) {}
         try { database.exec('ALTER TABLE comic_meta ADD COLUMN update_time INTEGER'); } catch (_) {}
+        // 索引
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_series_id ON comic_meta(series_id)'); } catch (_) {}
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_update_time ON comic_meta(update_time)'); } catch (_) {}
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_create_time ON comic_meta(create_time)'); } catch (_) {}
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_addtime ON comic_meta(addtime)'); } catch (_) {}
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_name ON comic_meta(name)'); } catch (_) {}
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_total_views ON comic_meta(total_views)'); } catch (_) {}
+        try { database.exec('CREATE INDEX IF NOT EXISTS idx_meta_likes ON comic_meta(likes)'); } catch (_) {}
         return database;
     }
 
