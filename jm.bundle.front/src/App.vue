@@ -4,26 +4,44 @@
     <n-message-provider>
       <n-dialog-provider>
       <div id="jm-app-root">
-        <header class="jmz-app-header">
-          <div class="jmz-app-header-inner">
+        <aside class="jmz-sidebar" v-if="!isDetail">
+          <div class="jmz-sidebar-head">
+            <img src="/icon.ico" class="jmz-app-logo" alt="" />
+            <span class="jmz-app-title">JM</span>
+          </div>
+          <nav class="jmz-sidebar-nav">
+            <router-link :to="{ name: 'catalog' }" class="jmz-nav-item" :class="{ 'jmz-nav-item--active': route.name === 'catalog' }">
+              <span class="jmz-nav-icon">📂</span>
+              <span>本地管理</span>
+            </router-link>
+            <router-link :to="{ name: 'search' }" class="jmz-nav-item" :class="{ 'jmz-nav-item--active': route.name === 'search' }">
+              <span class="jmz-nav-icon">🔍</span>
+              <span>漫画搜索</span>
+            </router-link>
+            <router-link :to="{ name: 'week' }" class="jmz-nav-item" :class="{ 'jmz-nav-item--active': route.name === 'week' }">
+              <span class="jmz-nav-icon">📅</span>
+              <span>每周必看</span>
+            </router-link>
+            <router-link :to="{ name: 'category' }" class="jmz-nav-item" :class="{ 'jmz-nav-item--active': route.name === 'category' }">
+              <span class="jmz-nav-icon">🏷️</span>
+              <span>分类排行</span>
+            </router-link>
+            <router-link :to="{ name: 'serial' }" class="jmz-nav-item" :class="{ 'jmz-nav-item--active': route.name === 'serial' }">
+              <span class="jmz-nav-icon">📆</span>
+              <span>每日连载</span>
+            </router-link>
+          </nav>
+          <div class="jmz-sidebar-foot">
+            <UserBar />
+          </div>
+        </aside>
+        <div class="jmz-main-area">
+          <header class="jmz-app-header">
             <div class="jmz-header-left">
               <n-button text size="small" class="jmz-app-back" v-if="isDetail" @click="backToCatalog">
                 <template #icon><n-icon :component="ArrowBack" /></template>
                 返回
               </n-button>
-              <img src="/icon.ico" class="jmz-app-logo" alt="" />
-              <span class="jmz-app-title">JM</span>
-            </div>
-            <div class="jmz-header-center">
-              <template v-if="!isDetail">
-                <div class="jmz-header-tabs">
-                  <router-link :to="{ name: 'catalog' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'catalog' }">本地管理</router-link>
-                  <router-link :to="{ name: 'search' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'search' }">漫画搜索</router-link>
-                  <router-link :to="{ name: 'week' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'week' }">每周必看</router-link>
-                  <router-link :to="{ name: 'category' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'category' }">分类排行</router-link>
-                  <router-link :to="{ name: 'serial' }" class="jmz-tab" :class="{ 'jmz-tab--active': route.name === 'serial' }">每日连载</router-link>
-                </div>
-              </template>
             </div>
             <div class="jmz-header-right">
               <template v-if="!isDetail">
@@ -46,22 +64,22 @@
                 <span>下载全部</span>
               </n-button>
               <n-checkbox v-if="!isDetail" v-model:checked="harmonyEnabled" size="small" class="jmz-harmony-checkbox">和谐化</n-checkbox>
-              <UserBar />
+              <n-button text size="small" class="jmz-header-btn" @click="doSign" :loading="signLoading">签到</n-button>
               <n-button text size="small" class="jmz-header-btn" @click="openTasks">
                 <template #icon><n-icon :component="ListOutline" /></template>
                 <span>任务</span>
                 <span v-if="live.queueCount > 0" class="jmz-task-badge">{{ live.queueCount }}</span>
               </n-button>
             </div>
-          </div>
-        </header>
-        <main class="jmz-app-main">
-          <router-view v-slot="{ Component }">
-            <keep-alive :include="['CatalogPage', 'SearchPage', 'WeekPage', 'CategoryPage', 'SerialPage']">
-              <component :is="Component" />
-            </keep-alive>
-          </router-view>
-        </main>
+          </header>
+          <main class="jmz-app-main">
+            <router-view v-slot="{ Component }">
+              <keep-alive :include="['CatalogPage', 'SearchPage', 'WeekPage', 'CategoryPage', 'SerialPage']">
+                <component :is="Component" />
+              </keep-alive>
+            </router-view>
+          </main>
+        </div>
         <TasksDialog v-model:show="showTasks" />
         <BatchDownloadDialog v-model:show="showBatchDownload" :comics="currentPageComics" />
       </div>
@@ -131,6 +149,20 @@ function applyHarmony() {
       if (!(el instanceof HTMLElement)) return
       if (el.dataset.orig) el.textContent = el.dataset.orig
     })
+  }
+}
+
+const signLoading = ref(false)
+async function doSign() {
+  signLoading.value = true
+  try {
+    const j = await postJson('/account/sign')
+    if (j.ok) alert(j.msg || '签到成功')
+    else alert(j.message || '签到失败')
+  } catch (e: any) {
+    alert(e.message || '签到失败')
+  } finally {
+    signLoading.value = false
   }
 }
 
@@ -212,29 +244,106 @@ onUnmounted(() => {
 #jm-app-root {
   min-height: 100vh;
   display: flex;
+}
+
+.jmz-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  background: #16161a;
+  border-right: 1px solid rgba(46, 46, 53, 0.6);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 100;
+}
+
+.jmz-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 44px;
+  border-bottom: 1px solid rgba(46, 46, 53, 0.5);
+  flex-shrink: 0;
+}
+
+.jmz-app-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.jmz-app-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #e0e0e6;
+  letter-spacing: -0.02em;
+}
+
+.jmz-sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.jmz-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #9b9bb4;
+  text-decoration: none;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.jmz-nav-item:hover {
+  color: #e0e0e6;
+  background: rgba(255, 255, 255, 0.04);
+}
+.jmz-nav-item--active {
+  color: #e0e0e6;
+  background: rgba(37, 99, 235, 0.15);
+  font-weight: 600;
+}
+
+.jmz-nav-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.jmz-sidebar-foot {
+  padding: 10px 12px;
+  border-top: 1px solid rgba(46, 46, 53, 0.5);
+}
+
+.jmz-main-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
 }
 
 .jmz-app-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  background: rgba(26, 26, 30, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(46, 46, 53, 0.7);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
-}
-
-.jmz-app-header-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 6px 16px;
   display: flex;
   align-items: center;
+  padding: 0 20px;
+  height: 44px;
+  flex-shrink: 0;
+  background: rgba(22, 22, 26, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(46, 46, 53, 0.6);
   gap: 8px;
-  height: 48px;
-  box-sizing: border-box;
 }
 
 .jmz-header-left {
@@ -244,64 +353,19 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.jmz-header-center {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  justify-content: center;
-}
-
-.jmz-header-tabs {
-  display: flex;
-  gap: 2px;
-  background: rgba(30, 30, 36, 0.6);
-  border-radius: 8px;
-  padding: 3px;
-  border: 1px solid rgba(46, 46, 53, 0.5);
-}
-
-.jmz-tab {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 16px;
-  border-radius: 5px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #7a7a8a;
-  text-decoration: none;
-  transition: all 0.2s;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-}
-
-.jmz-tab:hover {
-  color: #c4c4d6;
-}
-
-.jmz-tab--active {
-  color: #e0e0e6;
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
 .jmz-header-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
 }
-.jmz-header-right > :not(:last-child)::after {
-  content: '';
-  display: inline-block;
-  width: 1px;
-  height: 20px;
-  background: #2e2e35;
-  margin-left: 4px;
-}
+
 .jmz-header-btn {
   color: #9b9bb4 !important;
-  padding: 0 6px !important;
+  padding: 0 8px !important;
   font-size: 12px !important;
+  height: 28px !important;
 }
 .jmz-header-btn:hover {
   color: #e0e0e6 !important;
@@ -311,9 +375,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: rgba(46, 46, 53, 0.4);
-  border-radius: 8px;
+  background: rgba(46, 46, 53, 0.35);
+  border-radius: 6px;
   padding: 2px;
+}
+.jmz-header-sync-group .n-button {
+  font-size: 11px !important;
+  height: 24px !important;
 }
 
 .jmz-header-sync-progress {
@@ -329,26 +397,6 @@ onUnmounted(() => {
 }
 .jmz-app-back:hover {
   color: #c4c4d6 !important;
-}
-
-.jmz-app-logo {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  flex-shrink: 0;
-}
-.jmz-app-title {
-  font-size: 17px;
-  font-weight: 800;
-  color: #e0e0e6;
-  letter-spacing: -0.03em;
-}
-
-.jmz-header-task-btn {
-  color: #9b9bb4 !important;
-}
-.jmz-header-task-btn:hover {
-  color: #e0e0e6 !important;
 }
 
 .jmz-task-badge {
@@ -369,10 +417,13 @@ onUnmounted(() => {
 
 .jmz-app-main {
   flex: 1;
+  overflow-y: auto;
 }
 
 .jmz-harmony-checkbox {
-  margin-right: 4px;
+  display: flex;
+  align-items: center;
+  margin: 0;
 }
 .jmz-harmony-checkbox .n-checkbox__label {
   font-size: 12px !important;
@@ -382,5 +433,22 @@ onUnmounted(() => {
 .harmonize .xxx-img,
 .harmonize img.xxx-img {
   opacity: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .jmz-sidebar {
+    width: 52px;
+  }
+  .jmz-sidebar-head .jmz-app-title,
+  .jmz-nav-item span:last-child {
+    display: none;
+  }
+  .jmz-nav-item {
+    justify-content: center;
+    padding: 9px 0;
+  }
+  .jmz-nav-icon {
+    width: auto;
+  }
 }
 </style>
