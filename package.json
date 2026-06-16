@@ -18,7 +18,8 @@
     "jimp": "^1.6.1",
     "tough-cookie": "^6.0.1",
     "typescript": "^5.9.3",
-    "undici": "^6.21.3"
+    "undici": "^6.21.3",
+    "p-queue": "^9.3.0"
   },
   "devDependencies": {
     "@vercel/webpack-asset-relocator-loader": "^1.10.0",

@@ -1,9 +1,15 @@
+'use strict';
+
 const fs = require('node:fs');
+const PQueue = require('p-queue').default;
 
 const jmBundle = require('../jm.bundle/jm.bundle.js');
 const {SearchSort} = require('../jm.bundle/protocol');
 const {toQueryString, fetchAllPageData} = require('../util/http');
-const {removeFile} = require('../util/file');
+const {removeFile, listFiles, getBaseName} = require('../util/file');
+const {logProgress} = require('../util/log');
+
+const queue = new PQueue({concurrency: 30});
 
 async function getMeta(number) {
     try {
@@ -13,24 +19,54 @@ async function getMeta(number) {
     }
 }
 
+/**
+ * 批量执行任务
+ * @param list          任务参数列表
+ * @param runPromise    任务逻辑
+ * @param size          批量执行个数
+ * @return {Promise<void>}
+ */
+async function run(list, runPromise, size = 15) {
+    let complete = 0;
+    let total = list.length;
+    while (list.length) {
+        const batch = list.splice(0, size);
+        batch.forEach((obj) => {
+            queue.add(async () => {
+                try {
+                    await runPromise(obj);
+                } catch (e) {
+                    console.log(e.message);
+                } finally {
+                    complete += 1;
+                    console.log(`进度： ${complete} / ${total}`);
+                }
+            });
+        });
+        await queue.onIdle();
+    }
+}
+
 (async () => {
-    /**
-     ApiPath::Login | ApiPath::GetUserProfile => "/login",
-     ApiPath::Search => "/search",
-     ApiPath::GetComic => "/album",
-     ApiPath::GetChapter => "/chapter",
-     ApiPath::GetScrambleId => "/chapter_view_template",
-     ApiPath::GetFavoriteFolder => "/favorite",
-     ApiPath::GetWeeklyInfo => "/week",
-     ApiPath::GetWeekly => "/week/filter",
-     */
     await jmBundle.start({});
+    let {
+        config,
+        crawler
+    } = jmBundle.state;
+    let numbers = listFiles(`${config.dataDir}/info`)
+        .map((file) => Number.parseInt(getBaseName(file)));
+    await run(numbers, async (number) => {
+        let cdnHost = config.cdnHosts[Math.floor(Math.random() * config.cdnHosts.length)];
+        let cover = `${cdnHost}/media/albums/${number}.jpg`;
+        await crawler.fetchRemoteFile(cover);
+    });
+
     // await jmBundle.state.crawler.account.login();
-    removeFile(`${jmBundle.state.config.dataDir}/info/360203.json`);
-    removeFile(`${jmBundle.state.config.dataDir}/comic/360203.zip`);
-    let meta = await getMeta(275942);
-    let meta1 = await getMeta(360203);
-    console.log(meta);
+    // removeFile(`${jmBundle.state.config.dataDir}/info/360203.json`);
+    // removeFile(`${jmBundle.state.config.dataDir}/comic/360203.zip`);
+    // let meta = await getMeta(275942);
+    // let meta1 = await getMeta(360203);
+    // console.log(meta);
     // let res = await jmBundle.state.crawler.account.sign();
     // console.log(res);
     // await jmBundle.state.crawler.comic.downloadArchive(275942);

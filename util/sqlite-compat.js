@@ -32,13 +32,19 @@ function openDatabase(filePath) {
 
             return {
                 run(values) {
-                    return stmt.run(normalizeParams(values));
+                    const p = normalizeParams(values);
+                    if (p === undefined) return stmt.run();
+                    return stmt.run(p);
                 },
                 get(values) {
-                    return stmt.get(normalizeParams(values));
+                    const p = normalizeParams(values);
+                    if (p === undefined) return stmt.get();
+                    return stmt.get(p);
                 },
                 all(values) {
-                    return stmt.all(normalizeParams(values));
+                    const p = normalizeParams(values);
+                    if (p === undefined) return stmt.all();
+                    return stmt.all(p);
                 },
             };
         },

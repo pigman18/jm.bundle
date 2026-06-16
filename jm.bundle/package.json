@@ -33,7 +33,6 @@
     "marked-terminal": "^7.3.0",
     "morgan": "^1.10.1",
     "node-notifier": "^10.0.1",
-    "p-queue": "^9.3.0",
     "socks-proxy-agent": "^10.0.0",
     "tunnel": "^0.0.6"
   },

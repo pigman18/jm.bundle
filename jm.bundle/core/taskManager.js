@@ -51,7 +51,7 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
         tasks = JSON.parse(fs.readFileSync(tasksFile, 'utf-8'));
         tasks = tasks.filter(t => t.status !== 'removed');
         tasks.forEach(t => {
-          if (t.status === 'downloading') t.status = 'paused';
+          if (t.status === 'downloading') { t.status = 'paused'; t.speed = 0; t.downloadedSize = 0; t.progress = 0; }
         });
         console.log(`[taskManager] 加载 ${tasks.length} 个任务`);
       }
@@ -61,7 +61,19 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
     }
   }
 
+  let _saveTimer = null;
   function saveTasks() {
+    if (_saveTimer) clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+      _saveTimer = null;
+      _writeTasks();
+    }, 200);
+  }
+  function flushTasks() {
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+    _writeTasks();
+  }
+  function _writeTasks() {
     const dir = path.dirname(tasksFile);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -107,6 +119,7 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
           task.progress = Math.min(1, complete / total);
           task.downloadedSize = complete;
           task.totalSize = total;
+          _updateSpeed(task, complete);
         }
       }
       broadcast({
@@ -116,6 +129,7 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
           progress: task.progress,
           downloadedSize: task.downloadedSize,
           totalSize: task.totalSize,
+          speed: task.speed,
           status: 'downloading',
           step: task.step,
           stepState: task.stepState,
@@ -128,6 +142,13 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
 
   let runningCount = 0;
   const MAX_CONCURRENT = 5;
+  const _lastProgress = {};
+
+  function _updateSpeed(task, complete) {
+    const elapsed = Date.now() - task.addedDate;
+    const avgSpeed = elapsed > 0 ? Math.round(complete / (elapsed / 1000)) : 0;
+    task.speed = task.speed > 0 ? Math.round((avgSpeed + task.speed) / 2) : avgSpeed;
+  }
 
   async function addTask(number, labels, opts = {}) {
     number = Number(number);

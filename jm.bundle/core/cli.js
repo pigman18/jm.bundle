@@ -65,9 +65,23 @@ function createCli(
 
     const wait = () => sleep(50 + Math.random() * 50);
 
-    async function processBatch(list, fn) {
-        list.forEach(i => queue.add(() => fn(i)));
-        await queue.onIdle();
+    async function processBatch(list, fn, size = 15) {
+        const total = list.length;
+        let complete = 0;
+        const startTime = Date.now();
+        while (list.length) {
+            const batch = list.splice(0, size);
+            batch.forEach(i => queue.add(async () => {
+                try { await fn(i) } catch {}
+                complete++;
+                const remaining = total - complete;
+                const elapsedMs = Date.now() - startTime;
+                const avgMs = elapsedMs / complete;
+                const etaMs = avgMs * remaining;
+                console.log(`✅ 已执行 ${complete} | 剩余 ${remaining} | 已用 ${formatDuration(elapsedMs)} | 预计还需 ${formatDuration(etaMs)}`);
+            }));
+            await queue.onIdle();
+        }
     }
 
     /* ================= 执行器 ================= */
@@ -80,7 +94,7 @@ function createCli(
             touchFileSync(`${manifest.workspace}/temp/html/${number}.txt.flag`);
             console.log(`✅ 完成 ${number}`);
         } catch (e) {
-            if ('漫画信息不存在' === e.message) {
+            if ('漫画信息不存在' === e.message || '漫画不存在' === e.message) {
                 touchFileSync(`${manifest.workspace}/temp/html/${number}.txt.flag`);
             }
             console.log(`❌ ${number} 失败：${e.message}`);
@@ -101,35 +115,15 @@ function createCli(
 
         console.log(`${label} 共 ${numbers.length} 个`);
 
-        const startTime = Date.now();
-        let done = 0;
+        await processBatch(numbers, async (n) => {
+            try {
+                await runSingle(label, n, action);
+            } finally {
+                writeToFileSync(file, JSON.stringify(numbers));
+            }
 
-        while (numbers.length) {
-            const batch = shuffleArray([...new Set(numbers)]).slice(0, 15);
-
-            await processBatch(batch, async (n) => {
-                try {
-                    await runSingle(label, n, action);
-                } finally {
-                    done++;
-                    numbers = numbers.filter(x => x !== n);
-                    writeToFileSync(file, JSON.stringify(numbers));
-
-                    if (done > 0) {
-                        const elapsedMs = Date.now() - startTime;
-                        const avgMs = elapsedMs / done;
-                        const remaining = numbers.length;
-                        const etaMs = avgMs * remaining;
-
-                        console.log(
-                            `✅ 已执行 ${done} | 剩余 ${remaining} | 已用 ${formatDuration(elapsedMs)} | 预计还需 ${formatDuration(etaMs)}`
-                        );
-                    }
-                }
-
-                await wait();
-            });
-        }
+            await wait();
+        });
 
         console.log('全部处理完成');
     };
@@ -466,6 +460,35 @@ Examples:
             console.log('同步数据库 → 本地...');
             const count = await store.runDb2Local();
             console.log(`同步完成，共导出 ${count} 条`);
+        });
+
+    /* ================= Covers ================= */
+
+    program
+        .command('covers')
+        .description('批量下载封面')
+        .action(async () => {
+            const fileDir = path.join(config.dataDir, 'file');
+            const conn = await store.connect();
+            const rows = conn.prepare(`SELECT id FROM comic_meta WHERE series_id IS NULL OR series_id = '' OR series_id = '0' OR series_id = id`).all();
+            const numbers = rows.map(r => r.id).filter(n => !fs.existsSync(`${fileDir}/media/albums/${n}.jpg`));
+            if (!numbers.length) {
+                console.log('没有需要下载封面的漫画');
+                return;
+            }
+            console.log(`共 ${numbers.length} 个封面待下载`);
+            let done = 0;
+            await processBatch(numbers, async (n) => {
+                const cdnHost = config.cdnHosts[Math.floor(Math.random() * config.cdnHosts.length)];
+                const url = `${cdnHost}/media/albums/${n}.jpg`;
+                try {
+                    await crawler.fetchRemoteFile(url);
+                } catch (e) {
+                    console.log(`  ❌ JM${n}: ${e.message}`);
+                }
+                done++;
+            });
+            console.log(`封面下载完成，共 ${done} 个`);
         });
 
     /* ================= Readme / Changelog ================= */

@@ -92,7 +92,7 @@ function createServer(manifest, ctx, message, config, store, crawler, taskManage
         url = cdn2OriginUrl(url, config.host, config.cdnHosts);
         // 2、转换为文件路径（不用加/file）
         let dataPath = url2DataPath(url, "");
-        return `${serverOrigin}${FILE_URI}${dataPath}?originUrl=${encodeURIComponent(originUrl)}`;
+        return `${FILE_URI}${dataPath}?originUrl=${encodeURIComponent(originUrl)}`;
     }
 
     /** 将漫画 JSON 中的封面、详情 HTML、缩略图列表中的 http(s) 资源改为同源代理 URL */
