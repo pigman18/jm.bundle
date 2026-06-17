@@ -364,6 +364,67 @@ function withRetry(fn, retries = 3, delay = 1000) {
     };
 }
 
+/**
+ * 断点续传下载
+ * @param url               下载链接
+ * @param filePath          保存路径
+ * @param options           透传至 axios，额外支持 onProgress, proxy
+ * @return {Promise<string>} 最终文件路径
+ */
+async function downloadResume(url, filePath, options = {}) {
+    const { onProgress, proxy, ...axiosOpts } = options;
+    let resumeSize = 0;
+    const tmpPath = filePath + '.tmp';
+
+    // 检测已有部分文件
+    if (fs.existsSync(tmpPath)) {
+        try { resumeSize = fs.statSync(tmpPath).size; } catch { resumeSize = 0; }
+    } else if (fs.existsSync(filePath)) {
+        return filePath;
+    }
+
+    const headers = { ...(axiosOpts.headers || {}) };
+    if (resumeSize > 0) headers['Range'] = `bytes=${resumeSize}-`;
+
+    const axiosConfig = {
+        ...axiosOpts,
+        url,
+        method: 'GET',
+        responseType: 'stream',
+        headers,
+        ...(proxy ? { proxy: false, httpsAgent: new (require('https-proxy-agent').HttpsProxyAgent)(proxy) } : {}),
+    };
+
+    const resp = await axios(axiosConfig);
+    const supportRange = resp.status === 206;
+    const totalLen = parseInt(resp.headers['content-length'] || '0', 10);
+    const totalSize = supportRange ? resumeSize + totalLen : (totalLen || 0);
+
+    if (supportRange) {
+        // 续传：追加写入
+        const writer = fs.createWriteStream(tmpPath, { flags: 'a' });
+        resp.data.pipe(writer);
+        let downloaded = resumeSize;
+        resp.data.on('data', chunk => { downloaded += chunk.length; onProgress?.({ complete: downloaded, total: totalSize }); });
+        await new Promise((resolve, reject) => {
+            writer.on('finish', () => { fs.renameSync(tmpPath, filePath); resolve(); });
+            writer.on('error', reject);
+        });
+    } else {
+        // 不支持断点：全新下载
+        if (resumeSize > 0) { try { fs.rmSync(tmpPath); } catch {} resumeSize = 0; }
+        const writer = fs.createWriteStream(tmpPath);
+        resp.data.pipe(writer);
+        let downloaded = 0;
+        resp.data.on('data', chunk => { downloaded += chunk.length; onProgress?.({ complete: downloaded, total: totalSize }); });
+        await new Promise((resolve, reject) => {
+            writer.on('finish', () => { fs.renameSync(tmpPath, filePath); resolve(); });
+            writer.on('error', reject);
+        });
+    }
+    return filePath;
+}
+
 module.exports = {
     cdn2OriginUrl,
     saveAxiosResponse,
@@ -375,5 +436,6 @@ module.exports = {
     toQueryString,
     fetchAllPageData,
     guardStream,
+    downloadResume,
     ...Http
 };

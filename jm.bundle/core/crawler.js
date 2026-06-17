@@ -12,7 +12,7 @@ const lock = new AsyncLock();
 
 const {ApiPath, SearchSort, PHASE, STATE, STEP, ERR} = require('../protocol');
 const {retryAndCatch} = require('../../util/common');
-const {url2DataPath, saveAxiosResponse, getResponseStream, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData} = require('../../util/http');
+const {url2DataPath, downloadResume, getResponseStream, getAxiosResponseText, withRetry, toQueryString, fetchAllPageData} = require('../../util/http');
 const {touchFileSync, writeToFileSync, isNotEmptySync, renameSync} = require('../../util/file');
 const {parseComicRankingPage, parseSerializationList, parseWeekList, parseComicWeekList, parseMeta, parseNumber} = require('./parser');
 const {JmMagicConstants, decideHeadersAndTs, decodeDomainServerData, decodeRespData} = require('./mobile');
@@ -344,12 +344,12 @@ function createCrawler(manifest, ctx, message, config) {
      *  content-type: application/x-www-form-urlencoded
      * 会进行 301 转发，拿到 Location 就是下载文件地址
      * @param number
-     * @param targetStream
+     * @param filePath
      * @param phase
      * @param afterSteps
      * @return {Promise<null|*>}
      */
-    async function downloadAlbumArchive(number, targetStream, phase = PHASE.FETCH_COMIC, afterSteps = null) {
+    async function downloadAlbumArchive(number, filePath, phase = PHASE.FETCH_COMIC, afterSteps = null) {
         number = Number(number);
         // 1、执行下载流程
         return await message.doPhase(phase || PHASE.FETCH_COMIC, async (stepHandler, phaseMessageData) => {
@@ -377,23 +377,14 @@ function createCrawler(manifest, ctx, message, config) {
                 // 4、下载漫画
                 [STEP.DOWNLOAD]: async (realUrl) => {
                     return await stepHandler.doStep(STEP.DOWNLOAD, async (stepMessageData, onStepProgress) => {
-                        let response = await httpClient.get(realUrl, {
-                            responseType: 'stream'
-                        });
                         let finalComplete = 0, finalTotal = 0;
-                        let stream = await getResponseStream(response, {
-                            filename: `${number}`,
+                        await downloadResume(realUrl, filePath, {
+                            proxy: config.proxy,
                             onProgress: ({complete, total}) => {
                                 onStepProgress(complete, total);
                                 finalComplete = complete;
                                 finalTotal = total;
                             }
-                        });
-                        await new Promise((resolve, reject) => {
-                            streamPipeline(stream, targetStream, err => {
-                                if (err) reject(err);
-                                else resolve();
-                            });
                         });
                         if (afterSteps) {
                             await afterSteps({ number, complete: finalComplete, total: finalTotal });
@@ -453,7 +444,9 @@ function createCrawler(manifest, ctx, message, config) {
                 const response = await httpClient.get(url, {
                     responseType: 'stream',
                 });
-                await saveAxiosResponse(response, dataPath);
+                await downloadResume(url, dataPath, {
+                    proxy: config.proxy
+                });
                 return {
                     file: dataPath
                 }
@@ -539,8 +532,6 @@ function createCrawler(manifest, ctx, message, config) {
         downloadArchive: async (number, withAppendComicInfo = true, afterSteps = null) => {
             number = parseNumber(number);
             let archiveFile = `${comicDir}/${number}.zip`;
-            let archiveFileBak = archiveFile + '.bak';
-            touchFileSync(archiveFileBak);
             if (isNotEmptySync(archiveFile)) {
                 let st = fs.statSync(archiveFile);
                 return {
@@ -552,21 +543,16 @@ function createCrawler(manifest, ctx, message, config) {
             let {
                 complete,
                 total
-            } = await expireRetry(() => downloadAlbumArchive(number, fs.createWriteStream(archiveFileBak)));
+            } = await expireRetry(() => downloadAlbumArchive(number, archiveFile));
             if (!!total) {
-                try {
-                    renameSync(archiveFileBak, archiveFile);
-                    if (afterSteps) {
-                        await afterSteps({ number, file: archiveFile, complete, total });
-                    }
-                    return {
-                        file: archiveFile,
-                        complete: complete,
-                        total: total,
-                    };
-                } catch (e) {
-                    fs.rmSync(archiveFileBak);
+                if (afterSteps) {
+                    await afterSteps({ number, file: archiveFile, complete, total });
                 }
+                return {
+                    file: archiveFile,
+                    complete: complete,
+                    total: total,
+                };
             }
             throw ERR.COMIC_NOT_FOUND;
         },

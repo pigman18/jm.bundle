@@ -49,27 +49,15 @@ async function run(list, runPromise, size = 15) {
 
 (async () => {
     await jmBundle.start({});
-    let {
-        config,
-        crawler
-    } = jmBundle.state;
-    let numbers = listFiles(`${config.dataDir}/info`)
-        .map((file) => Number.parseInt(getBaseName(file)));
-    await run(numbers, async (number) => {
-        let cdnHost = config.cdnHosts[Math.floor(Math.random() * config.cdnHosts.length)];
-        let cover = `${cdnHost}/media/albums/${number}.jpg`;
-        await crawler.fetchRemoteFile(cover);
-    });
-
     // await jmBundle.state.crawler.account.login();
     // removeFile(`${jmBundle.state.config.dataDir}/info/360203.json`);
-    // removeFile(`${jmBundle.state.config.dataDir}/comic/360203.zip`);
+    removeFile(`${jmBundle.state.config.dataDir}/comic/275942.zip`);
     // let meta = await getMeta(275942);
     // let meta1 = await getMeta(360203);
     // console.log(meta);
     // let res = await jmBundle.state.crawler.account.sign();
     // console.log(res);
-    // await jmBundle.state.crawler.comic.downloadArchive(275942);
+    await jmBundle.state.crawler.comic.downloadArchive(275942);
     // let serialization0 = await jmBundle.state.crawler.rank.serialization(0);
     // let serialization1 = await jmBundle.state.crawler.rank.serialization(1);
     // let serialization2 = await jmBundle.state.crawler.rank.serialization(2);
