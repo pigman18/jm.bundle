@@ -265,6 +265,10 @@ function createCrawler(manifest, ctx, message, config) {
                 // 直接退出重试
                 return true;
             }
+            if ('socket hang up' === err.message) {
+                // 连接异常，重试
+                return false;
+            }
             // 退出
             return true;
         });

@@ -19,6 +19,7 @@
     "rank:serials": "node jm.bundle.js rank:serials",
     "local2db": "node jm.bundle.js local2db",
     "db2local": "node jm.bundle.js db2local",
+    "covers": "node jm.bundle.js covers",
     "server": "node jm.bundle.js server",
     "command": "node jm.bundle.js"
   },

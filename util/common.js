@@ -123,6 +123,7 @@ async function retryAndCatch(func, errorFunc, maxRetryCount = 5, retryCount = 0)
     // 4、满足重试条件
     if (!exit && retryCount < maxRetryCount) {
       retryCount += 1;
+      await sleep(200 + 200 * Math.random());
       return retryAndCatch(func, errorFunc, maxRetryCount, retryCount);
     }
     // 5、无法继续重试1，抛出异常
