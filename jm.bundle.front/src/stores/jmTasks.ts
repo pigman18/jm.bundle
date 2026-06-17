@@ -104,7 +104,7 @@ export const useJmTasksStore = defineStore('jm-tasks', {
           if (msg.id !== undefined) {
             const idx = this.tasks.findIndex(t => t.id === msg.id)
             if (idx !== -1) {
-              this.tasks[idx].status = 'downloading'
+              Object.assign(this.tasks[idx], { status: 'waiting', error: null, progress: 0, speed: 0, downloadedSize: 0, totalSize: 0 }, msg.task || {})
               this.syncZipByKey(this.tasks[idx], live)
             }
           }

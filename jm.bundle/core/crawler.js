@@ -254,31 +254,13 @@ function createCrawler(manifest, ctx, message, config) {
             if (403 === err.status) {
                 // 出现403错误，需要重新登录
                 await login(err.phase, err.phaseData);
-                // 不退出继续重试
-                return false;
-            }
-            if (502 === err.status) {
-                // 不退出继续重试
-                return false;
-            }
-            if (500 === err.status) {
-                // 不退出继续重试
-                return false;
             }
             if (404 === err.status) {
-                // 直接退出重试
+                // 无效资源，直接退出重试
                 return true;
             }
-            if ('socket hang up' === err.message) {
-                // 连接异常，重试
-                return false;
-            }
-            if ('Client network socket disconnected before secure TLS connection was established' === err.message) {
-                // 连接异常，重试
-                return false;
-            }
-            // 退出
-            return true;
+            // 继续重试
+            return false;
         });
     }
 

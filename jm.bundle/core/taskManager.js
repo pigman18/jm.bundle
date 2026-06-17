@@ -313,11 +313,15 @@ function createTaskManager(manifest, ctx, store, crawler, message, config) {
     task.status = 'waiting';
     task.error = null;
     task.progress = 0;
+    task.speed = 0;
+    task.downloadedSize = 0;
+    task.totalSize = 0;
     task.step = null;
     task.stepState = null;
+    task.payload = null;
     task.addedDate = Date.now();
     saveTasks();
-    broadcast({ type: 'started', id });
+    broadcast({ type: 'started', id, task: { status: 'waiting', error: null, progress: 0, speed: 0, downloadedSize: 0, totalSize: 0 } });
     processQueue();
   }
 
