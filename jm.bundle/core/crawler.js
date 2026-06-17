@@ -261,11 +261,19 @@ function createCrawler(manifest, ctx, message, config) {
                 // 不退出继续重试
                 return false;
             }
+            if (500 === err.status) {
+                // 不退出继续重试
+                return false;
+            }
             if (404 === err.status) {
                 // 直接退出重试
                 return true;
             }
             if ('socket hang up' === err.message) {
+                // 连接异常，重试
+                return false;
+            }
+            if ('Client network socket disconnected before secure TLS connection was established' === err.message) {
                 // 连接异常，重试
                 return false;
             }
